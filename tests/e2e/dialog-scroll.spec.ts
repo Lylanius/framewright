@@ -12,6 +12,11 @@ test('quiz maker scrolls to the bottom', async ({ page, isMobile }, info) => {
     });
   } else await page.locator('.rail').getByRole('button', { name: 'Templates', exact: true }).click();
   await page.getByRole('button', { name: 'Make a quiz' }).click();
+  // Centred and fully on screen (no part hanging off the right edge).
+  const d = (await page.locator('.dialog').boundingBox())!;
+  const vw = page.viewportSize()!.width;
+  expect(d.x + d.width).toBeLessThanOrEqual(vw);
+  expect(Math.abs(d.x - (vw - d.x - d.width))).toBeLessThan(2);
   for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Add a round' }).click();
   const body = page.locator('.dialog .body');
   // The content is taller than the dialog, and the body really scrolls to its end.
