@@ -21,4 +21,10 @@ test('nothing is hidden under the iPhone status bar', async ({ page, isMobile },
   await page.getByRole('dialog', { name: 'Export' }).getByRole('button', { name: 'Close' }).first().tap();
   await page.getByRole('button', { name: 'Post planner' }).tap();
   await below('planner: close', page.getByRole('button', { name: 'Close planner' }));
+  // Home-screen mode: the app fills the whole screen (no empty band at the bottom).
+  await page.getByRole('button', { name: 'Close planner' }).tap();
+  await page.evaluate(() => document.documentElement.classList.add('ios-standalone'));
+  const fill = await page.evaluate(() => ({ root: document.getElementById('root')!.getBoundingClientRect().height, editor: document.querySelector('.editor')!.getBoundingClientRect().bottom, vh: innerHeight }));
+  expect(Math.abs(fill.root - fill.vh)).toBeLessThan(2);
+  expect(Math.abs(fill.editor - fill.vh)).toBeLessThan(2);
 });
