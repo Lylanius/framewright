@@ -6,6 +6,7 @@ import { answerScale, answerSlots, buildQuiz, fitAnswerScale, DEFAULT_QUIZ, intr
 import { valueAt } from '../../src/core/keyframes';
 import { maskValue } from '../../src/core/masks';
 import { SFX, wavBytes } from '../../src/core/sfx';
+import { tidyVoice, toMono } from '../../src/core/voiceTrim';
 import { alignBox, distribute, snapBox } from '../../src/core/snap';
 import { addOverlayClip, addUnderlayClip, findClip, mainTrackIndex, moveClipLayer, projectDuration } from '../../src/core/timeline';
 import type { MediaItem } from '../../src/core/types';
@@ -76,6 +77,25 @@ describe('design elements', () => {
     expect(motionState(m, 0.01, 5).scale).toBeGreaterThan(3);
     expect(motionState(m, 1, 5).scale).toBeCloseTo(1);
   });
+  it('the intro sting builds up, then hits as the title lands; a recorded shout comes on the hit', () => {
+    const s = SFX.find((d) => d.id === 'sting')!.make(48000);
+    const rms = (a: number, b: number) => { let t = 0; for (let i = a * 48000; i < b * 48000; i++) t += s[i] ** 2; return Math.sqrt(t / ((b - a) * 48000)); };
+    expect(rms(0.4, 0.6)).toBeGreaterThan(rms(0.1, 0.3) * 1.5); // quieter swell, big hit
+    expect(rms(0.4, 0.6)).toBeGreaterThan(rms(1.6, 1.95) * 4); // dies away
+  });
+  it('a voice recording is trimmed to the words and levelled', () => {
+    const rate = 8000, sig = new Float32Array(rate * 3);
+    for (let i = 0; i < sig.length; i++) sig[i] = (Math.random() - 0.5) * 0.004; // room hiss
+    for (let i = rate; i < rate * 1.5; i++) sig[i] = 0.3 * Math.sin(i / 3); // "who's that…" from 1.0 s to 1.5 s
+    const out = tidyVoice(sig, rate);
+    expect(out.length / rate).toBeGreaterThan(0.5);
+    expect(out.length / rate).toBeLessThan(0.8); // 0.5 s of words + a short breath either side
+    let peak = 0; for (const v of out) peak = Math.max(peak, Math.abs(v));
+    expect(peak).toBeCloseTo(0.9, 1);
+    expect(Math.abs(out[0])).toBeLessThan(0.01);
+    expect(tidyVoice(new Float32Array(100), rate).length).toBe(0);
+    expect(Array.from(toMono([new Float32Array([1, 0]), new Float32Array([0, 1])]))).toEqual([0.5, 0.5]);
+  });
   it('sound effects are clean, normalised WAVs', () => {
     for (const d of SFX) {
       const s = d.make(48000);
@@ -136,6 +156,16 @@ describe('quiz maker', () => {
     expect(mainTrackIndex(r.project)).toBe(r.project.tracks.findIndex((t) => t.clips.some((c) => c.mediaId === 'A')));
     expect(pictureScale(q0, pic('P1'), 540)).toBeCloseTo(0.5);
     void createTextClip;
+  });
+  it('with the sting, it starts with the intro and a recorded shout comes on the hit', () => {
+    const { p } = sampleProject();
+    const before = projectDuration(p);
+    const sting = media('sting', 2, 'audio'), voice = media('voice', 2, 'audio');
+    const r = buildQuiz({ ...p, media: [...p.media, pic('P1'), sting, voice] }, [{ picture: pic('P1'), answers: ['Aa', 'Bb'], correct: 0 }], { ...DEFAULT_QUIZ, sounds: { sting, introVoice: voice } });
+    const all = r.project.tracks.flatMap((t) => t.clips);
+    expect(all.find((c) => c.mediaId === 'sting')!.start).toBeCloseTo(before);
+    expect(all.find((c) => c.mediaId === 'voice')!.start).toBeCloseTo(before + 0.4);
+    expect(DEFAULT_QUIZ.introSound).toBe('sting');
   });
   it('adds an intro that slams the title in, then crossfades into round 1', () => {
     const { p } = sampleProject();

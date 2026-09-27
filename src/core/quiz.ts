@@ -37,6 +37,8 @@ export interface QuizOptions {
   /** Opening title card: the title slams in over a starburst, then crossfades into round 1. */
   intro: boolean;
   introSeconds: number;
+  /** Sound under the intro title: an original dramatic sting, a plain boom, or none. */
+  introSound: 'sting' | 'boom' | 'none';
   bgColour: string;
   accent: string; // title / letters colour
   countdown: 'bar' | 'ring' | 'none';
@@ -44,13 +46,13 @@ export interface QuizOptions {
   answerSize: number;
   /** 2×2 grid, or one answer per row (wider buttons for long answers). */
   answerLayout: 'grid' | 'list';
-  sounds: { tick?: MediaItem; tock?: MediaItem; ding?: MediaItem; whoosh?: MediaItem; boom?: MediaItem; introVoice?: MediaItem };
+  sounds: { tick?: MediaItem; tock?: MediaItem; ding?: MediaItem; whoosh?: MediaItem; boom?: MediaItem; sting?: MediaItem; introVoice?: MediaItem };
 }
 
 export const DEFAULT_QUIZ: Omit<QuizOptions, 'sounds'> = {
   title: "WHO'S THAT\nCHARACTER?", firstRound: 1, showRound: true, thinkSeconds: 5, revealSeconds: 3,
   hide: 'zoom', zoom: 3.5, background: 'streaks', bgColour: '#e3141f', accent: '#ffd23f', countdown: 'bar', answerSize: 1, answerLayout: 'grid',
-  burst: true, intro: true, introSeconds: 2.5,
+  burst: true, intro: true, introSeconds: 2.5, introSound: 'sting',
 };
 
 const LETTERS = ['A)', 'B)', 'C)', 'D)'];
@@ -180,8 +182,9 @@ export function buildQuiz(p: Project, rounds: QuizRound[], o: QuizOptions): { pr
     burst.motion = motion({ in: 'zoom', out: 'fade', duration: FADE });
     put(T.introBurst, burst);
     put(T.introTitle, text(start0, intro + FADE, 0, 0, { ...titleStyle, fontSize: Math.round(W * 0.085) }, { in: 'slam', out: 'fade', duration: 0.6 }));
-    snd(o.sounds.introVoice, start0 + 0.1, voice);
+    snd(o.sounds.introVoice, start0 + (o.sounds.sting ? 0.4 : 0.1), voice); // with the sting, the shout comes on the hit
     snd(o.sounds.boom, start0 + 0.38); // as the title lands
+    snd(o.sounds.sting, start0); // builds for 0.38 s, then hits as the title lands
   }
   // Starburst behind the picture for every round.
   if (o.burst && rounds.length) {

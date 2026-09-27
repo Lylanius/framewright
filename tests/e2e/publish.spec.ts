@@ -138,3 +138,35 @@ test.describe('post planner', () => {
     await expect(page.locator('.composer small.mono')).toContainText('1080×1920');
   });
 });
+
+test('phones: after exporting, "Save to camera roll" opens the share sheet with the video', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'phones only');
+  test.setTimeout(180_000);
+  // The test browser has no share sheet: stand in for the iPhone's.
+  await page.addInitScript(() => {
+    (window as any).__shared = null;
+    Object.defineProperty(navigator, 'canShare', { value: (d: any) => !!d?.files?.length, configurable: true });
+    Object.defineProperty(navigator, 'share', { value: async (d: any) => { (window as any).__shared = d.files.map((x: File) => ({ name: x.name, type: x.type, size: x.size })); }, configurable: true });
+  });
+  await page.goto('/');
+  await page.getByRole('button', { name: /^TikTok/ }).click();
+  const b64 = (await import('node:fs')).readFileSync(f('vertical.webm')).toString('base64');
+  await page.evaluate(async (data) => {
+    const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+    await (window as any).__fw.app.getState().importFiles([new File([bytes], 'vertical.webm', { type: 'video/webm' })], 0);
+  }, b64);
+  await expect.poll(() => page.evaluate(() => (window as any).__fw.app.getState().project.tracks.flatMap((t: any) => t.clips).length), { timeout: 60_000 }).toBeGreaterThan(0);
+  await page.evaluate(() => (window as any).__fw.app.getState().setExportOpen(true));
+  await page.getByRole('button', { name: 'MP4', exact: true }).click();
+  await page.locator('.dialog footer .btn.primary').click();
+  const btn = page.getByRole('button', { name: 'Save to camera roll' });
+  await expect(btn).toBeVisible({ timeout: 150_000 });
+  await expect(page.getByRole('button', { name: 'Save to Files' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/export-camera-roll-phone.png' });
+  await btn.click();
+  await expect(page.locator('.toast', { hasText: 'in your Photos' })).toBeVisible();
+  const shared = await page.evaluate(() => (window as any).__shared);
+  expect(shared[0].type).toBe('video/mp4');
+  expect(shared[0].name).toMatch(/\.mp4$/);
+  expect(shared[0].size).toBeGreaterThan(1000);
+});

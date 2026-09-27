@@ -92,6 +92,27 @@ export const SFX: SfxDef[] = [
     },
   },
   {
+    // An original "who is it?!" sting: a quick swell that lands on two brassy
+    // chord stabs with a thump. Hits at 0.38 s, when the intro title slams in.
+    id: 'sting', name: 'Mystery sting', description: 'Dramatic “who is it?!” hit for quiz intros (lands at 0.38 s).', seconds: 2,
+    make: (r) => {
+      const HIT = 0.38, n = noise(33), bp = biquad('bp', r), lp1 = biquad('lp', r), lp2 = biquad('lp', r), lpc = biquad('lp', r);
+      const saw = (hz: number[], t: number) => hz.reduce((v, f) => v + 2 * ((f * t) % 1) - 1 + 2 * ((f * 1.006 * t) % 1) - 1, 0) / (hz.length * 2);
+      const stab1 = [146.83, 220, 293.66, 349.23], stab2 = [155.56, 233.08, 311.13, 392]; // D minor, then up a half-step
+      let ph = 0;
+      return render(2, r, 0.8, (t) => {
+        const pre = t < HIT ? t / HIT : 0;
+        const swell = pre > 0 ? bp(n(), 400 + 3200 * pre * pre, 1.4) * pre * pre * 1.3 : bp(0, 3600, 1.4);
+        const a = t - HIT, b = t - HIT - 0.26;
+        const c1 = a >= 0 ? lp1(saw(stab1, a), 600 + 3400 * Math.exp(-a * 9), 0.9) * (a < 0.26 ? 1 : Math.exp(-(a - 0.26) / 0.05)) : 0;
+        const c2 = b >= 0 ? lp2(saw(stab2, b), 700 + 3800 * Math.exp(-b * 5), 0.9) * env(b, 0.006, 0.55) : 0;
+        if (a >= 0) ph += (TAU * (40 + 90 * Math.exp(-a * 16))) / r;
+        const thump = a >= 0 ? Math.sin(ph) * Math.exp(-a / 0.3) * 0.9 + lpc(n(), 2500, 0.7) * Math.exp(-a / 0.04) * 0.5 : 0;
+        return swell + c1 * 0.9 + c2 * 0.9 + thump;
+      });
+    },
+  },
+  {
     id: 'whoosh', name: 'Whoosh', description: 'Airy swish for titles and transitions.', seconds: 0.6,
     make: (r) => {
       const n = noise(11), bp = biquad('bp', r), lp = biquad('lp', r);

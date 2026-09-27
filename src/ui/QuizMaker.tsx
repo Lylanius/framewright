@@ -8,6 +8,7 @@ import { Dialog, PropRow, Seg } from './components/Controls';
 import { Icon } from './components/Icon';
 import { QuizPreview } from './QuizPreview';
 import { suggestFocus } from './quizFocus';
+import { VoiceRecorder } from './VoiceRecorder';
 import { ZoomEditor } from './ZoomEditor';
 import { useApp, useTime } from './store';
 
@@ -45,6 +46,16 @@ function ZoomThumb({ r, zoom, index, onEdit, onChange }: { r: Draft; zoom: numbe
   );
 }
 
+let playing: HTMLAudioElement | null = null;
+function playFile(f: Blob) {
+  playing?.pause();
+  const url = URL.createObjectURL(f);
+  playing = new Audio(url);
+  playing.onended = () => URL.revokeObjectURL(url);
+  void playing.play().catch(() => URL.revokeObjectURL(url));
+}
+const playSfx = (id: string) => { const d = SFX.find((x) => x.id === id); if (d) playFile(sfxFile(d)); };
+
 export function QuizMaker({ onClose }: { onClose: () => void }) {
   const { importFiles, apply, toast } = useApp();
   const [opts, setOpts] = useState({ ...DEFAULT_QUIZ, sounds: true });
@@ -80,7 +91,8 @@ export function QuizMaker({ onClose }: { onClose: () => void }) {
       const picIds: (string | undefined)[] = [];
       for (const r of ready) picIds.push((await importFiles([r.file!]))[0]);
       const sfxIds: (string | undefined)[] = [];
-      if (opts.sounds) for (const id of ['tick', 'tock', 'ding', 'whoosh', ...(opts.intro ? ['boom'] : [])]) sfxIds.push((await importFiles([sfxFile(SFX.find((x) => x.id === id)!)]))[0]);
+      const introId = opts.intro && opts.introSound !== 'none' ? opts.introSound : null;
+      if (opts.sounds) for (const id of ['tick', 'tock', 'ding', 'whoosh', ...(introId ? [introId] : [])]) sfxIds.push((await importFiles([sfxFile(SFX.find((x) => x.id === id)!)]))[0]);
       const voiceId = opts.intro && voice ? (await importFiles([voice]))[0] : undefined;
       const media = useApp.getState().project!.media;
       const byId = (id?: string) => media.find((m) => m.id === id) as MediaItem | undefined;
@@ -89,7 +101,7 @@ export function QuizMaker({ onClose }: { onClose: () => void }) {
         const correctText = r.answers[r.correct]?.trim();
         return { picture: byId(picIds[i])!, answers, correct: Math.max(0, answers.indexOf(correctText ?? '')), focus: r.focus, zoom: r.zoom };
       }).filter((r) => r.picture);
-      const o: QuizOptions = { ...opts, sounds: { tick: byId(sfxIds[0]), tock: byId(sfxIds[1]), ding: byId(sfxIds[2]), whoosh: byId(sfxIds[3]), boom: byId(sfxIds[4]), introVoice: byId(voiceId) } };
+      const o: QuizOptions = { ...opts, sounds: { tick: byId(sfxIds[0]), tock: byId(sfxIds[1]), ding: byId(sfxIds[2]), whoosh: byId(sfxIds[3]), boom: introId === 'boom' ? byId(sfxIds[4]) : undefined, sting: introId === 'sting' ? byId(sfxIds[4]) : undefined, introVoice: byId(voiceId) } };
       let start = 0;
       apply(`Quiz: ${qr.length} round${qr.length === 1 ? '' : 's'}`, (p) => { const r = buildQuiz(p, qr, o); start = r.start; return r.project; });
       useTime.getState().setTime(start);
@@ -124,13 +136,25 @@ export function QuizMaker({ onClose }: { onClose: () => void }) {
           {opts.intro && (
             <div className="quiz-intro">
               <PropRow label="Intro length" value={opts.introSeconds} min={1.5} max={6} step={0.5} unit="s" onChange={(v) => set({ introSeconds: v })} />
-              <div className="row" style={{ gap: 6 }}>
-                <button className="btn sm" onClick={() => voiceRef.current?.click()}><Icon name="audio" size={13} />{voice ? 'Change voice/sound' : 'Add your voice or a sound'}</button>
-                {voice && <><small className="grow faint" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{voice.name}</small>
-                  <button className="icon-btn sm" onClick={() => setVoice(null)} aria-label="Remove intro sound"><Icon name="trash" size={13} /></button></>}
+              {opts.sounds && (
+                <div className="field"><span>Intro sound</span>
+                  <div className="row" style={{ gap: 6 }}>
+                    <Seg label="Intro sound" value={opts.introSound} onChange={(v: QuizOptions['introSound']) => set({ introSound: v })} options={[{ value: 'sting', label: 'Sting' }, { value: 'boom', label: 'Boom' }, { value: 'none', label: 'None' }]} />
+                    {opts.introSound !== 'none' && <button className="icon-btn sm" onClick={() => playSfx(opts.introSound)} aria-label="Hear the intro sound"><Icon name="play" size={13} /></button>}
+                  </div>
+                </div>
+              )}
+              <small className="muted" style={{ marginTop: 2 }}>Your voice (optional)</small>
+              <div className="row wrap" style={{ gap: 6 }}>
+                <VoiceRecorder onDone={(f) => { setVoice(f); toast('Got it — tap ▶ to hear it back.', 'success'); }} onError={(m) => toast(m, 'error')} />
+                <button className="btn sm" onClick={() => voiceRef.current?.click()}><Icon name="upload" size={13} />{voice ? 'Use a file instead' : 'Add a sound file'}</button>
               </div>
-              <input ref={voiceRef} type="file" accept="audio/*,video/*" hidden aria-label="Intro voice or sound" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setVoice(f); }} />
-              <small className="faint">Optional — e.g. record yourself reading the title out. It plays as the title lands{opts.sounds ? ', with a boom' : ''}.</small>
+              {voice && <div className="row" style={{ gap: 6 }}>
+                <button className="icon-btn sm" onClick={() => playFile(voice)} aria-label="Hear your intro voice"><Icon name="play" size={13} /></button>
+                <small className="grow faint" style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{voice.name}</small>
+                <button className="icon-btn sm" onClick={() => setVoice(null)} aria-label="Remove intro sound"><Icon name="trash" size={13} /></button>
+              </div>}
+              <small className="faint">Tap Record and shout the title (“Who’s that…?!”) — silence at the start and end is trimmed for you. It plays as the title lands. Your recording stays on this device.</small>
             </div>
           )}
           <PropRow label="Thinking time" value={opts.thinkSeconds} min={2} max={15} step={1} unit="s" onChange={(v) => set({ thinkSeconds: v })} />

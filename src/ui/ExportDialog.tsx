@@ -120,6 +120,24 @@ export function ExportDialog() {
     } catch (e) { toast((e as Error).message, 'error'); }
   };
 
+  // On phones (iPhone especially) the share sheet is the only way a web app can put a
+  // video in the camera roll: it offers “Save Video”. Must run straight from the tap.
+  const photosFile = useMemo(() => {
+    if (!result || result.native || !('share' in navigator) || !navigator.canShare) return null;
+    // Photos takes MP4/MOV video, GIFs and pictures — not WebM.
+    if (!/\.(mp4|mov|gif|png|jpe?g)$/i.test(result.filename) || !matchMedia('(pointer: coarse)').matches) return null;
+    const type = result.blob.type || (result.filename.endsWith('.mp4') ? 'video/mp4' : result.filename.endsWith('.mov') ? 'video/quicktime' : '');
+    const f = new File([result.blob], result.filename, { type });
+    try { return navigator.canShare({ files: [f] }) ? f : null; } catch { return null; }
+  }, [result, kind]);
+  const toPhotos = () => {
+    if (!photosFile) return;
+    navigator.share({ files: [photosFile] }).then(
+      () => toast(kind === 'image' ? 'Picture shared.' : 'Done — if you chose “Save Video”, it’s in your Photos.', 'success'),
+      (e: Error) => { if (e.name !== 'AbortError') toast('Couldn’t open the share sheet. Use Save instead, then save it from the Files app.', 'error'); },
+    );
+  };
+
   const busy = !!progress;
   // Hand the finished video to the post planner.
   const postIt = async () => {
@@ -139,7 +157,8 @@ export function ExportDialog() {
         : result ? <>
           <button className="btn" onClick={() => { setResult(null); setResultUrl(null); }}>Change settings</button>
           {kind === 'video' && /mp4|quicktime/.test(result.blob.type || result.filename) && <button className="btn" onClick={() => void postIt()}><Icon name="history" size={16} />Post or schedule</button>}
-          <button className="btn primary" onClick={save}><Icon name="save" size={16} />{isPhone ? `Save or share ${result.filename}` : `Save ${result.filename}`}</button>
+          {photosFile && <button className="btn primary" onClick={toPhotos}><Icon name="image" size={16} />{kind === 'image' ? 'Save to Photos' : 'Save to camera roll'}</button>}
+          <button className={photosFile ? 'btn' : 'btn primary'} onClick={save}><Icon name="save" size={16} />{photosFile ? 'Save to Files' : isPhone ? `Save or share ${result.filename}` : `Save ${result.filename}`}</button>
         </>
         : <>
           <span className="faint" style={{ marginRight: 'auto', fontSize: 12, alignSelf: 'center' }}>

@@ -127,3 +127,27 @@ test('Escape closes only the close-up editor, not the quiz maker', async ({ page
   await expect(page.getByRole('dialog', { name: /Close-up for round 1/ })).toHaveCount(0);
   await expect(page.getByRole('dialog', { name: 'Quiz maker' })).toBeVisible();
 });
+
+test('record your own intro shout and add the sting', async ({ page, isMobile }) => {
+  test.setTimeout(120_000);
+  await page.goto('/');
+  await openQuizMaker(page, isMobile);
+  await expect(page.getByRole('radio', { name: 'Sting' })).toHaveAttribute('aria-checked', 'true');
+  // The test browser's fake microphone plays a beep.
+  await page.getByRole('button', { name: 'Record your voice' }).click();
+  await page.waitForTimeout(1500);
+  await page.getByRole('button', { name: 'Stop recording' }).click();
+  await expect(page.getByText('Intro voice (recorded).wav')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: 'Hear your intro voice' })).toBeVisible();
+  await page.locator('.quiz-round input[type=file]').first().setInputFiles(f('creature.png'));
+  await page.getByLabel('Round 1 answer A').fill('Alpha');
+  await page.getByLabel('Round 1 answer B').fill('Beta');
+  await page.getByRole('button', { name: 'Hear your intro voice' }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `test-results/quiz-voice-${isMobile ? 'phone' : 'desktop'}.png` });
+  await page.getByRole('button', { name: /Add 1 round/ }).click();
+  await expect(page.locator('.toast', { hasText: /Made 1 quiz round/ })).toBeVisible({ timeout: 60_000 });
+  const names = await page.evaluate(() => (window as any).__fw.app.getState().project.tracks.flatMap((t: any) => t.clips.map((c: any) => c.name)));
+  expect(names.some((n: string) => /Mystery sting/.test(n))).toBe(true);
+  expect(names.some((n: string) => /Intro voice/.test(n))).toBe(true);
+  expect(names.some((n: string) => /Boom/.test(n))).toBe(false);
+});
