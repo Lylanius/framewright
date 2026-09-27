@@ -28,6 +28,8 @@
   --ui: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
   --safe-b: env(safe-area-inset-bottom, 0px);
+  /* Bottom tool bar: sits lower than the full home-bar gap (like the phone's own apps), leaving just enough room for the home bar. */
+  --safe-tabs: max(0px, calc(env(safe-area-inset-bottom, 0px) - 16px));
   /* Home-screen app on iPhone: the status bar (clock, notch) sits over the top of the page. */
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
@@ -364,7 +366,7 @@ input[type='checkbox'] { accent-color: var(--accent); width: 16px; height: 16px;
 @media (max-width: 900px) {
   .editor {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: calc(48px + var(--safe-t)) minmax(180px, 1fr) auto calc(62px + var(--safe-b));
+    grid-template-rows: calc(48px + var(--safe-t)) minmax(180px, 1fr) auto calc(62px + var(--safe-tabs));
     grid-template-areas: 'top' 'preview' 'timeline' 'tabs';
   }
   .rail, .panel, .inspector, .split-handle { display: none; }
@@ -381,7 +383,7 @@ input[type='checkbox'] { accent-color: var(--accent); width: 16px; height: 16px;
   .junction { width: 30px; height: 30px; margin: -15px 0 0 -15px; }
   .topbar .title-input { max-width: 40vw; }
   .mobile-tabs {
-    grid-area: tabs; display: flex; overflow-x: auto; scrollbar-width: none; gap: 2px; padding: 6px 8px var(--safe-b);
+    grid-area: tabs; display: flex; overflow-x: auto; scrollbar-width: none; gap: 2px; padding: 6px 8px var(--safe-tabs);
     background: var(--panel); border-top: 1px solid var(--line-soft); scroll-snap-type: x proximity;
   }
   .mobile-tabs button { flex: none; width: 64px; display: flex; flex-direction: column; align-items: center; gap: 3px; border: 0; background: none; color: var(--muted); font-size: 10.5px; font-weight: 600; padding: 4px 0; border-radius: var(--radius-sm); scroll-snap-align: start; }
@@ -404,7 +406,7 @@ input[type='checkbox'] { accent-color: var(--accent); width: 16px; height: 16px;
 @media (max-width: 900px) and (orientation: landscape) and (max-height: 520px) {
   .editor {
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-    grid-template-rows: calc(44px + var(--safe-t)) minmax(0, 1fr) calc(54px + var(--safe-b));
+    grid-template-rows: calc(44px + var(--safe-t)) minmax(0, 1fr) calc(54px + var(--safe-tabs));
     grid-template-areas: 'top top' 'preview timeline' 'tabs tabs';
   }
   .timeline { height: auto; min-height: 0; }
