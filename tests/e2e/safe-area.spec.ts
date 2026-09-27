@@ -21,10 +21,18 @@ test('nothing is hidden under the iPhone status bar', async ({ page, isMobile },
   await page.getByRole('dialog', { name: 'Export' }).getByRole('button', { name: 'Close' }).first().tap();
   await page.getByRole('button', { name: 'Post planner' }).tap();
   await below('planner: close', page.getByRole('button', { name: 'Close planner' }));
-  // Home-screen mode: the app fills the whole screen (no empty band at the bottom).
+  // The editor is pinned: the page can't scroll or bounce, and it fills the screen exactly.
   await page.getByRole('button', { name: 'Close planner' }).tap();
-  await page.evaluate(() => document.documentElement.classList.add('ios-standalone'));
-  const fill = await page.evaluate(() => ({ root: document.getElementById('root')!.getBoundingClientRect().height, editor: document.querySelector('.editor')!.getBoundingClientRect().bottom, vh: innerHeight }));
-  expect(Math.abs(fill.root - fill.vh)).toBeLessThan(2);
-  expect(Math.abs(fill.editor - fill.vh)).toBeLessThan(2);
+  const st = await page.evaluate(() => {
+    window.scrollTo(0, 400);
+    document.scrollingElement!.scrollTop = 400;
+    const ed = document.querySelector('.editor')!.getBoundingClientRect();
+    return { y: scrollY, top: ed.top, bottom: ed.bottom, vh: innerHeight, sh: document.scrollingElement!.scrollHeight };
+  });
+  expect(st.y).toBe(0);
+  expect(st.top).toBe(0);
+  expect(Math.abs(st.bottom - st.vh)).toBeLessThan(2);
+  await page.mouse.wheel(0, 600);
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => scrollY)).toBe(0);
 });

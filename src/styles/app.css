@@ -38,13 +38,10 @@
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
-/* Home-screen app: iPhones report "100%" as the screen minus the status bar, which
-   left an empty band at the bottom. There are no browser bars here, so the full
-   screen height is exactly right. */
-@media (display-mode: standalone), (display-mode: fullscreen) {
-  html, body, #root { height: 100vh; min-height: 100vh; }
-}
-html.ios-standalone, html.ios-standalone body, html.ios-standalone #root { height: 100vh; min-height: 100vh; }
+/* The editor is pinned to the screen: the page itself never scrolls or bounces
+   (panels, the timeline and pop-ups scroll inside themselves). */
+html.fw-editor, html.fw-editor body { overflow: hidden; overscroll-behavior: none; }
+html.fw-editor .editor { position: fixed; inset: 0; height: auto; }
 /* Nothing may make the page wider than the screen: on phones that widens the whole
    layout, so pop-ups (sized to the page) get cut off on the right. */
 html, body { overflow-x: hidden; overflow-x: clip; }

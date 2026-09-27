@@ -15,8 +15,6 @@ createRoot(document.getElementById('root')!).render(
 );
 
 // Installable, offline-capable app when served normally (not inside an embedding host).
-// Older iPhones don't report display-mode for home-screen apps; this flag does.
-if ((navigator as unknown as { standalone?: boolean }).standalone) document.documentElement.classList.add('ios-standalone');
 const embedded = !!(window as unknown as { claude?: unknown }).claude || window.self !== window.top;
 if (import.meta.env.PROD && import.meta.env.MODE !== 'single' && !embedded && 'serviceWorker' in navigator && location.protocol.startsWith('http') && !(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()) {
   window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => undefined); });

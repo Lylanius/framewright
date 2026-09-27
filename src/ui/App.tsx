@@ -27,6 +27,8 @@ export function App() {
   const screen = useApp((s) => s.screen);
   const project = useApp((s) => s.project);
   useEffect(() => { installNativeHooks(); const t = setTimeout(installNativeHooks, 1500); return () => clearTimeout(t); }, []);
+  // Editor: lock the page so it can't scroll or rubber-band on phones.
+  useEffect(() => { document.documentElement.classList.toggle('fw-editor', screen === 'editor'); }, [screen]);
   // Post planner: checks for posts that are due, whichever screen is open.
   useEffect(() => { startScheduler(); }, []);
   return (
