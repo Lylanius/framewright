@@ -1,0 +1,64 @@
+# Desktop installers: `npm run desktop:dist` (current OS) — see docs/NATIVE.md
+appId: app.framewright.editor
+productName: Framewright
+copyright: Framewright — personal video editor
+directories:
+  output: release
+  buildResources: desktop/build
+files:
+  - dist/**
+  - desktop/out/**
+  - desktop/build/icon.png
+  - "!node_modules/**"
+  # Chromium always has WebAssembly SIMD, so the non-SIMD MediaPipe fallbacks aren't needed.
+  - "!dist/vendor/mediapipe/**/*_solution_wasm_bin.*"
+extraMetadata:
+  main: desktop/out/main.cjs
+  type: commonjs
+asar: true
+asarUnpack: []
+npmRebuild: false
+nodeGypRebuild: false
+buildDependenciesFromSource: false
+electronLanguages: [en-GB, en-US]
+fileAssociations:
+  - ext: framewright
+    name: Framewright project
+    role: Editor
+protocols: []
+publish: null
+linux:
+  target: [AppImage]
+  category: AudioVideo
+  maintainer: Framewright
+  synopsis: Private, offline video editor
+  executableName: framewright
+  desktop:
+    entry:
+      StartupWMClass: Framewright
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  artifactName: Framewright-Setup-${version}.${ext}
+portable:
+  artifactName: Framewright-Portable-${version}.${ext}
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  category: public.app-category.video
+  hardenedRuntime: true
+  entitlements: desktop/build/entitlements.mac.plist
+  entitlementsInherit: desktop/build/entitlements.mac.plist
+  extendInfo:
+    NSCameraUsageDescription: Framewright records video from your camera when you ask it to.
+    NSMicrophoneUsageDescription: Framewright records voiceovers and commentary when you ask it to.
+    NSAudioCaptureUsageDescription: Framewright can include your computer's sound in screen recordings.

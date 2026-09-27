@@ -1,0 +1,11 @@
+{
+  "when": "2026-09-26T07:31:46.998Z",
+  "timeline600": {
+    "buildToPaintMs": 112,
+    "selectMs": 28,
+    "deleteMs": 33,
+    "undoMs": 64,
+    "zoomStepMs": 66,
+    "clipsInDom": 53
+  }
+}

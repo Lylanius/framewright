@@ -1,0 +1,49 @@
+{
+  "when": "2026-09-26T07:57:05.678Z",
+  "proxy": "ready",
+  "playbackPlain": {
+    "fps": 61.3,
+    "drawMsAvg": 3.79,
+    "longGaps": 0,
+    "maxGapMs": 23,
+    "seeks": 0
+  },
+  "scrubPlain": {
+    "medianMs": 62,
+    "maxMs": 81
+  },
+  "exportPlain": {
+    "seconds": 13.288,
+    "bytes": 6292041,
+    "fps": 27.1
+  },
+  "playbackFx": {
+    "fps": 61,
+    "drawMsAvg": 12.96,
+    "longGaps": 0,
+    "maxGapMs": 39,
+    "seeks": 0
+  },
+  "playbackFxRendered": {
+    "fps": 61.5,
+    "drawMsAvg": 5.48,
+    "longGaps": 0,
+    "maxGapMs": 24,
+    "seeks": 0,
+    "cachedFrames": 246,
+    "miss": {
+      "none": 0,
+      "loading": 0,
+      "drift": 0
+    }
+  },
+  "scrubFx": {
+    "medianMs": 98,
+    "maxMs": 129
+  },
+  "exportFx": {
+    "seconds": 53.421,
+    "bytes": 4021429,
+    "fps": 6.7
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "when": "2026-09-26T07:38:16.366Z",
+  "import": {
+    "secondsToTiles": 59.2,
+    "longTasks": 1,
+    "longTaskTotalMs": 67,
+    "longestTaskMs": 67
+  },
+  "proxy": "ready",
+  "playbackPlain": {
+    "fps": 61.3,
+    "drawMsAvg": 3.69,
+    "longGaps": 0,
+    "maxGapMs": 19,
+    "seeks": 0
+  },
+  "scrubPlain": {
+    "medianMs": 47,
+    "maxMs": 64
+  },
+  "exportPlain": {
+    "seconds": 13.785,
+    "bytes": 6253721,
+    "fps": 26.1
+  },
+  "playbackFx": {
+    "fps": 60.8,
+    "drawMsAvg": 12.85,
+    "longGaps": 0,
+    "maxGapMs": 31,
+    "seeks": 0
+  },
+  "scrubFx": {
+    "medianMs": 65,
+    "maxMs": 101
+  },
+  "exportFx": {
+    "seconds": 53.245,
+    "bytes": 3983109,
+    "fps": 6.8
+  }
+}

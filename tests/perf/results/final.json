@@ -1,0 +1,63 @@
+{
+  "when": "2026-09-26T14:52:08.620Z",
+  "import": {
+    "secondsToTiles": 11,
+    "longTasks": 0,
+    "longTaskTotalMs": 0,
+    "longestTaskMs": 0
+  },
+  "proxy": "ready",
+  "playbackPlain": {
+    "fps": 61.5,
+    "drawMsAvg": 3.19,
+    "longGaps": 0,
+    "maxGapMs": 26,
+    "seeks": 0
+  },
+  "scrubPlain": {
+    "medianMs": 64,
+    "maxMs": 81
+  },
+  "exportPlain": {
+    "seconds": 14.266,
+    "bytes": 6292041,
+    "fps": 25.2
+  },
+  "playbackFx": {
+    "fps": 56.3,
+    "drawMsAvg": 14.48,
+    "longGaps": 0,
+    "maxGapMs": 37,
+    "seeks": 0
+  },
+  "playbackFxRendered": {
+    "fps": 61.3,
+    "drawMsAvg": 5,
+    "longGaps": 1,
+    "maxGapMs": 54,
+    "seeks": 0,
+    "cachedFrames": 245,
+    "miss": {
+      "none": 0,
+      "loading": 0,
+      "drift": 0
+    }
+  },
+  "scrubFx": {
+    "medianMs": 119,
+    "maxMs": 179
+  },
+  "exportFx": {
+    "seconds": 60.663,
+    "bytes": 4021429,
+    "fps": 5.9
+  },
+  "timeline600": {
+    "buildToPaintMs": 244,
+    "selectMs": 20,
+    "deleteMs": 55,
+    "undoMs": 65,
+    "zoomStepMs": 103,
+    "clipsInDom": 53
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "when": "2026-09-26T07:33:30.357Z",
+  "playbackPlain": {
+    "fps": 61.3,
+    "drawMsAvg": 7.47,
+    "longGaps": 0,
+    "maxGapMs": 26,
+    "seeks": 0
+  },
+  "scrubPlain": {
+    "medianMs": 229,
+    "maxMs": 429
+  },
+  "exportPlain": {
+    "seconds": 13.382,
+    "bytes": 6253721,
+    "fps": 26.9
+  },
+  "playbackFx": {
+    "fps": 50.5,
+    "drawMsAvg": 16.32,
+    "longGaps": 1,
+    "maxGapMs": 55,
+    "seeks": 0
+  },
+  "scrubFx": {
+    "medianMs": 255,
+    "maxMs": 458
+  },
+  "exportFx": {
+    "seconds": 53.818,
+    "bytes": 3983109,
+    "fps": 6.7
+  }
+}

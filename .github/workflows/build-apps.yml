@@ -1,0 +1,97 @@
+# Builds every version of Framewright. Push this project to a GitHub repository
+# (private is fine), open the "Actions" tab and run "Build apps" — or push a tag
+# like v0.4.0. When it finishes, download the installers from the run's
+# "Artifacts" section. Nothing here is signed with paid certificates (see docs/NATIVE.md).
+name: Build apps
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  desktop:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            args: --win nsis portable --x64
+            files: release/*.exe
+          - os: macos-latest
+            args: --mac dmg --arm64 --x64
+            files: release/*.dmg
+          - os: ubuntu-latest
+            args: --linux AppImage --x64
+            files: release/*.AppImage
+    runs-on: ${{ matrix.os }}
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # no paid signing certificate; macOS gets an ad-hoc signature
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run build
+      - run: node desktop/build.mjs
+      - run: npx electron-builder ${{ matrix.args }} --publish never ${{ runner.os == 'macOS' && '-c.mac.identity=-' || '' }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Framewright-${{ runner.os }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+
+  android:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync android
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+      - name: Sign APK (a throwaway key made on the build machine — fine for installing on your own phone)
+        run: |
+          keytool -genkeypair -v -keystore fw.jks -storepass framewright -keypass framewright -alias fw -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Framewright"
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          $BT/zipalign -f 4 android/app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+          $BT/apksigner sign --ks fw.jks --ks-pass pass:framewright --out Framewright.apk aligned.apk
+      - uses: actions/upload-artifact@v4
+        with: { name: Framewright-Android, path: Framewright.apk }
+
+  ios:
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync ios
+      - name: Build (unsigned — re-signed with your Apple ID by Sideloadly/AltStore)
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release -sdk iphoneos \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+          mkdir -p Payload && cp -R build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -qr Framewright-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with: { name: Framewright-iOS, path: Framewright-unsigned.ipa }

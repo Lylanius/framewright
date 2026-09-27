@@ -1,0 +1,16 @@
+node_modules
+dist
+dist-single
+public/vendor
+test-results
+*.tmp.mjs
+
+# Phone projects: web assets are copied in by `npx cap sync`
+android/app/src/main/assets/public
+android/.gradle
+android/app/build
+android/build
+ios/App/App/public
+ios/App/build
+release
+desktop/out
