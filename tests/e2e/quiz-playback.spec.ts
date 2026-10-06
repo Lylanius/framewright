@@ -168,3 +168,27 @@ test('the first round number can be cleared and retyped', async ({ page, isMobil
   await box.blur();
   await expect(box).toHaveValue('27'); // left empty: keeps the last number
 });
+
+test('a quiz video opens on the title card, so that is its cover', async ({ page, isMobile }) => {
+  test.setTimeout(120_000);
+  await page.goto('/');
+  await openQuizMaker(page, isMobile);
+  await page.locator('.quiz-round input[type=file]').first().setInputFiles(f('creature.png'));
+  await page.getByLabel('Round 1 answer A').fill('Alpha');
+  await page.getByLabel('Round 1 answer B').fill('Beta');
+  await page.getByRole('button', { name: /Add 1 round/ }).click();
+  await expect(page.locator('.toast', { hasText: /Made 1 quiz round/ })).toBeVisible({ timeout: 60_000 });
+  await page.evaluate(() => { (window as any).__fw.time.getState().setTime(0); (window as any).__fw.app.getState().player?.seek(0); });
+  await page.waitForTimeout(1200);
+  const canvas = page.locator('.preview canvas, canvas.preview-canvas, .stage canvas').first();
+  await canvas.screenshot({ path: `test-results/quiz-cover-${isMobile ? 'phone' : 'desktop'}.png` });
+  // Title letters are yellow: plenty of yellow in the middle of the very first frame.
+  const yellow = await canvas.evaluate((c: HTMLCanvasElement) => {
+    const t = document.createElement('canvas'); t.width = 90; t.height = 160;
+    const x = t.getContext('2d')!; x.drawImage(c, 0, 0, 90, 160);
+    const d = x.getImageData(0, 48, 90, 64).data; let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] > 200 && d[i + 1] > 170 && d[i + 2] < 120) n++;
+    return n;
+  });
+  expect(yellow).toBeGreaterThan(150);
+});

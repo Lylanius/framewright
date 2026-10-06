@@ -39,6 +39,9 @@ export interface QuizOptions {
   introSeconds: number;
   /** Sound under the intro title: an original dramatic sting, a plain boom, or none. */
   introSound: 'sting' | 'boom' | 'none';
+  /** Line under the intro title: the round number, your own words, or nothing. */
+  introSub: 'round' | 'custom' | 'none';
+  introText: string;
   bgColour: string;
   accent: string; // title / letters colour
   countdown: 'bar' | 'ring' | 'none';
@@ -52,7 +55,7 @@ export interface QuizOptions {
 export const DEFAULT_QUIZ: Omit<QuizOptions, 'sounds'> = {
   title: "WHO'S THAT\nPOKÉMON?", firstRound: 1, showRound: true, thinkSeconds: 5, revealSeconds: 3,
   hide: 'zoom', zoom: 3.5, background: 'streaks', bgColour: '#e3141f', accent: '#ffd23f', countdown: 'bar', answerSize: 1, answerLayout: 'grid',
-  burst: true, intro: true, introSeconds: 2.5, introSound: 'boom',
+  burst: true, intro: true, introSeconds: 2.5, introSound: 'boom', introSub: 'round', introText: '',
 };
 
 const LETTERS = ['A)', 'B)', 'C)', 'D)'];
@@ -146,6 +149,13 @@ function burstStyle(p: Project, size: number): ShapeStyle {
   return { ...defaultShape('starburst', p.settings), width: size, height: size };
 }
 
+/** The line under the intro title, or '' for none. */
+export function introSubtitle(o: Pick<QuizOptions, 'introSub' | 'introText' | 'firstRound'>, rounds: number): string {
+  if (o.introSub === 'custom') return o.introText.trim();
+  if (o.introSub !== 'round') return '';
+  return rounds > 1 ? `Rounds ${o.firstRound}–${o.firstRound + rounds - 1}` : `Round ${o.firstRound}`;
+}
+
 /**
  * Add quiz rounds to the end of a project. Returns the new project and the
  * time range the rounds occupy.
@@ -166,8 +176,8 @@ export function buildQuiz(p: Project, rounds: QuizRound[], o: QuizOptions): { pr
   q = addUnderlayClip(q, createShapeClip(bgStyle, start0, total));
 
   // Tracks, back to front (clips on one track can't overlap, so each layer gets its own).
-  const names = ['Quiz burst', 'Quiz picture', 'Quiz ring', 'Answer A', 'Answer B', 'Answer C', 'Answer D', 'Right answer', 'Quiz round', 'Quiz title', 'Quiz countdown', 'Intro burst', 'Intro title'];
-  const T = { burst: 0, picture: 1, ring: 2, answer: 3, right: 7, round: 8, title: 9, countdown: 10, introBurst: 11, introTitle: 12 };
+  const names = ['Quiz burst', 'Quiz picture', 'Quiz ring', 'Answer A', 'Answer B', 'Answer C', 'Answer D', 'Right answer', 'Quiz round', 'Quiz title', 'Quiz countdown', 'Intro burst', 'Intro title', 'Intro subtitle'];
+  const T = { burst: 0, picture: 1, ring: 2, answer: 3, right: 7, round: 8, title: 9, countdown: 10, introBurst: 11, introTitle: 12, introSub: 13 };
   const tracks: Track[] = names.map((n) => createTrack('visual', n));
   const put = (i: number, c: Clip) => { tracks[i].clips.push(c); };
   const audio: Clip[] = [], swoosh: Clip[] = [], voice: Clip[] = [];
@@ -177,11 +187,35 @@ export function buildQuiz(p: Project, rounds: QuizRound[], o: QuizOptions): { pr
 
   // Intro: the title slams in over a starburst, holds, then crossfades into round 1.
   if (intro) {
-    const burst = createShapeClip(burstStyle(q, W * 1.15), start0, intro + FADE);
+    // Cover: phones and apps use a video's very first frame as its thumbnail, so when the
+    // quiz opens the video, that frame shows the finished title card. Then the slam plays.
+    const cover = start0 < 1e-6 ? 1 / p.settings.fps : 0;
+    const introStyle = { ...titleStyle, fontSize: Math.round(W * 0.085) };
+    if (cover) {
+      const still = createShapeClip(burstStyle(q, W * 1.15), start0, cover);
+      still.name = 'Cover starburst';
+      still.motion = motion({ in: 'none' });
+      put(T.introBurst, still);
+      const t = text(start0, cover, 0, 0, introStyle, { in: 'none' });
+      t.name = 'Cover title';
+      put(T.introTitle, t);
+    }
+    // Line under the title ("Round 8", or your own words): pops in just after the title lands.
+    const sub = introSubtitle(o, rounds.length);
+    if (sub) {
+      const subStyle: Partial<TextStyle> = { content: sub, fontFamily: 'Archivo Black', fontSize: Math.round(W * 0.052), color: '#ffffff', strokeColor: '#1f4fb8', strokeWidth: 7, uppercase: true, shadowColor: 'rgba(0,0,0,0.35)', shadowOffsetY: 6 };
+      const lines = o.title.split('\n').length, y = 0.03 + lines * 0.027; // sits just below the title, however many lines it has
+      if (cover) { const c = text(start0, cover, y, 0, subStyle, { in: 'none' }); c.name = 'Cover subtitle'; put(T.introSub, c); }
+      const at = Math.max(cover, Math.min(0.55, intro - 0.6));
+      const c = text(start0 + at, intro + FADE - at, y, 0, subStyle, { in: 'pop', out: 'fade', duration: 0.3 });
+      c.name = 'Intro subtitle';
+      put(T.introSub, c);
+    }
+    const burst = createShapeClip(burstStyle(q, W * 1.15), start0 + cover, intro + FADE - cover);
     burst.name = 'Intro starburst';
     burst.motion = motion({ in: 'zoom', out: 'fade', duration: FADE });
     put(T.introBurst, burst);
-    put(T.introTitle, text(start0, intro + FADE, 0, 0, { ...titleStyle, fontSize: Math.round(W * 0.085) }, { in: 'slam', out: 'fade', duration: 0.6 }));
+    put(T.introTitle, text(start0 + cover, intro + FADE - cover, 0, 0, introStyle, { in: 'slam', out: 'fade', duration: 0.6 }));
     snd(o.sounds.introVoice, start0 + (o.sounds.sting ? 0.4 : 0.1), voice); // with the sting, the shout comes on the hit
     snd(o.sounds.boom, start0 + 0.38); // as the title lands
     snd(o.sounds.sting, start0); // builds for 0.38 s, then hits as the title lands

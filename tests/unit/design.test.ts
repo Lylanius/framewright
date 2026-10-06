@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createShapeClip, createTextClip, defaultShape } from '../../src/core/defaults';
 import { motionState } from '../../src/core/motion';
 import { parseProject, serializeProject } from '../../src/core/projectIO';
-import { answerScale, answerSlots, buildQuiz, fitAnswerScale, DEFAULT_QUIZ, introLength, pictureScale, quizLength, roundLength, zoomCrop } from '../../src/core/quiz';
+import { answerScale, answerSlots, buildQuiz, introSubtitle, fitAnswerScale, DEFAULT_QUIZ, introLength, pictureScale, quizLength, roundLength, zoomCrop } from '../../src/core/quiz';
 import { valueAt } from '../../src/core/keyframes';
 import { maskValue } from '../../src/core/masks';
 import { SFX, wavBytes } from '../../src/core/sfx';
@@ -167,6 +167,42 @@ describe('quiz maker', () => {
     expect(all.find((c) => c.mediaId === 'voice')!.start).toBeCloseTo(before + 0.4);
     expect(DEFAULT_QUIZ.introSound).toBe('boom');
     expect(DEFAULT_QUIZ.title).toBe("WHO'S THAT\nPOKÉMON?");
+  });
+  it('when the quiz opens the video, the very first frame is the finished title card (the cover)', () => {
+    const { p } = sampleProject();
+    const empty = { ...p, tracks: p.tracks.map((t) => ({ ...t, clips: [] })), media: [pic('P1')] };
+    expect(projectDuration(empty)).toBe(0);
+    const r = buildQuiz(empty, [{ picture: pic('P1'), answers: ['Aa', 'Bb'], correct: 0 }], { ...DEFAULT_QUIZ, sounds: {} });
+    const all = r.project.tracks.flatMap((t) => t.clips);
+    const frame = 1 / empty.settings.fps;
+    const cover = all.find((c) => c.name === 'Cover title')!;
+    expect(cover.start).toBe(0);
+    expect(cover.duration).toBeCloseTo(frame);
+    expect(cover.text!.content).toBe(DEFAULT_QUIZ.title);
+    expect(cover.motion!.in).toBe('none'); // already in place, not mid-animation
+    expect(all.find((c) => c.name === 'Cover starburst')!.duration).toBeCloseTo(frame);
+    const slam = all.find((c) => c.motion?.in === 'slam')!;
+    expect(slam.start).toBeCloseTo(frame); // then the slam plays as before
+    expect(r.end - r.start).toBeCloseTo(quizLength(DEFAULT_QUIZ, 1)); // same total length
+    for (const t of r.project.tracks) { const cs = [...t.clips].sort((a, b) => a.start - b.start); for (let i = 1; i < cs.length; i++) expect(cs[i].start).toBeGreaterThanOrEqual(cs[i - 1].start + cs[i - 1].duration - 1e-6); }
+  });
+  it('intro can show the round number or your own text under the title', () => {
+    expect(introSubtitle({ introSub: 'round', introText: '', firstRound: 8 }, 1)).toBe('Round 8');
+    expect(introSubtitle({ introSub: 'round', introText: '', firstRound: 8 }, 3)).toBe('Rounds 8–10');
+    expect(introSubtitle({ introSub: 'custom', introText: ' Gen 1 edition ', firstRound: 8 }, 1)).toBe('Gen 1 edition');
+    expect(introSubtitle({ introSub: 'none', introText: 'x', firstRound: 8 }, 1)).toBe('');
+    const { p } = sampleProject();
+    const empty = { ...p, tracks: p.tracks.map((t) => ({ ...t, clips: [] })), media: [pic('P1')] };
+    const build = (o: Partial<typeof DEFAULT_QUIZ>) => buildQuiz(empty, [{ picture: pic('P1'), answers: ['Aa', 'Bb'], correct: 0 }], { ...DEFAULT_QUIZ, ...o, sounds: {} }).project.tracks.flatMap((t) => t.clips);
+    const all = build({ firstRound: 8 });
+    const sub = all.find((c) => c.name === 'Intro subtitle')!;
+    expect(sub.text!.content).toBe('Round 8');
+    expect(sub.transform.y).toBeGreaterThan(0.05); // below the centred title
+    expect(sub.start).toBeGreaterThan(0.4); // after the title has landed
+    expect(all.find((c) => c.name === 'Cover subtitle')!.start).toBe(0); // and it's on the cover frame
+    expect(build({ introSub: 'custom', introText: 'Gen 1 edition' }).find((c) => c.name === 'Intro subtitle')!.text!.content).toBe('Gen 1 edition');
+    expect(build({ introSub: 'none' }).some((c) => c.name === 'Intro subtitle')).toBe(false);
+    expect(build({ introSub: 'custom', introText: '  ' }).some((c) => c.name === 'Intro subtitle')).toBe(false);
   });
   it('adds an intro that slams the title in, then crossfades into round 1', () => {
     const { p } = sampleProject();
