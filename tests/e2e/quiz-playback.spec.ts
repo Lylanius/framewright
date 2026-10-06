@@ -153,3 +153,18 @@ test('record your own intro shout and add the sting', async ({ page, isMobile })
   expect(names.some((n: string) => /Intro voice/.test(n))).toBe(true);
   expect(names.some((n: string) => /Boom/.test(n))).toBe(false);
 });
+
+test('the first round number can be cleared and retyped', async ({ page, isMobile }) => {
+  await page.goto('/');
+  await openQuizMaker(page, isMobile);
+  const box = page.getByLabel('First round number');
+  await box.click();
+  await box.press('End');
+  await box.press('Backspace');
+  await expect(box).toHaveValue('');
+  await box.pressSequentially('27');
+  await expect(box).toHaveValue('27');
+  await box.fill('');
+  await box.blur();
+  await expect(box).toHaveValue('27'); // left empty: keeps the last number
+});

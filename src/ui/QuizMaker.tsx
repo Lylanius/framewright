@@ -65,6 +65,7 @@ export function QuizMaker({ onClose }: { onClose: () => void }) {
   const [editing, setEditing] = useState<number | null>(null); // round whose close-up is open
   const [voice, setVoice] = useState<File | null>(null); // optional intro voice / sound
   const voiceRef = useRef<HTMLInputElement>(null);
+  const [roundText, setRoundText] = useState<string | null>(null); // what's typed in "from", so the box can be emptied while typing
   const settings = useApp((s) => s.project?.settings);
   const { sounds: _s, ...look } = opts; void _s;
   const fileRefs = useRef(new Map<number, HTMLInputElement>());
@@ -130,7 +131,9 @@ export function QuizMaker({ onClose }: { onClose: () => void }) {
           </label>
           <div className="row">
             <label className="row grow"><input type="checkbox" checked={opts.showRound} onChange={() => set({ showRound: !opts.showRound })} /> Show “Round N”</label>
-            {opts.showRound && <label className="row" style={{ gap: 6 }}>from <input className="input sm" type="number" min={1} value={opts.firstRound} onChange={(e) => set({ firstRound: Math.max(1, +e.target.value || 1) })} style={{ width: 64 }} aria-label="First round number" /></label>}
+            {opts.showRound && <label className="row" style={{ gap: 6 }}>from <input className="input sm" type="text" inputMode="numeric" pattern="[0-9]*" value={roundText ?? String(opts.firstRound)} onFocus={(e) => e.target.select()}
+              onChange={(e) => { const t = e.target.value.replace(/\D/g, '').slice(0, 4); setRoundText(t); if (+t >= 1) set({ firstRound: +t }); }}
+              onBlur={() => setRoundText(null)} style={{ width: 64 }} aria-label="First round number" /></label>}
           </div>
           <label className="row"><input type="checkbox" checked={opts.intro} onChange={() => set({ intro: !opts.intro })} aria-label="Start with an intro" /> Start with an intro (title slams in)</label>
           {opts.intro && (
