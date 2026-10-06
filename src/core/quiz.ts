@@ -18,6 +18,8 @@ export interface QuizRound {
   correct: number;
   /** 'zoom' mode: the point to zoom in on, as fractions of the picture (0..1). Defaults to the centre. */
   focus?: { x: number; y: number };
+  /** Spot-the-shiny rounds: the four pictures in the order shown (A, B, C, D); `correct` is the real shiny. */
+  variants?: MediaItem[];
   /** 'zoom' mode: this round's own zoom (overrides the quiz-wide setting). */
   zoom?: number;
 }
@@ -39,6 +41,8 @@ export interface QuizOptions {
   introSeconds: number;
   /** Sound under the intro title: an original dramatic sting, a plain boom, or none. */
   introSound: 'sting' | 'boom' | 'none';
+  /** 'guess' = who's that? (one picture, text answers). 'shiny' = spot the real shiny (four pictures A–D). */
+  kind?: 'guess' | 'shiny';
   /** Line under the intro title: the round number, your own words, or nothing. */
   introSub: 'round' | 'custom' | 'none';
   introText: string;
@@ -49,7 +53,7 @@ export interface QuizOptions {
   answerSize: number;
   /** 2×2 grid, or one answer per row (wider buttons for long answers). */
   answerLayout: 'grid' | 'list';
-  sounds: { tick?: MediaItem; tock?: MediaItem; ding?: MediaItem; whoosh?: MediaItem; boom?: MediaItem; sting?: MediaItem; introVoice?: MediaItem };
+  sounds: { tick?: MediaItem; tock?: MediaItem; ding?: MediaItem; whoosh?: MediaItem; boom?: MediaItem; sting?: MediaItem; sparkle?: MediaItem; introVoice?: MediaItem };
 }
 
 export const DEFAULT_QUIZ: Omit<QuizOptions, 'sounds'> = {
@@ -58,7 +62,29 @@ export const DEFAULT_QUIZ: Omit<QuizOptions, 'sounds'> = {
   burst: true, intro: true, introSeconds: 2.5, introSound: 'boom', introSub: 'round', introText: '',
 };
 
+export const SHINY_TITLE = 'SPOT THE\nREAL SHINY!';
+export const SHINY_GREEN = '#00E676';
 const LETTERS = ['A)', 'B)', 'C)', 'D)'];
+
+/**
+ * Spot-the-shiny layout: where the four picture tiles and the A–D buttons go
+ * (x, y from the centre as fractions of the frame; sizes in pixels).
+ * Tall and square videos get a 2 × 2 grid, wide ones four in a row.
+ */
+export function shinyLayout(W: number, H: number): { tile: number; tiles: { x: number; y: number }[]; buttons: { x: number; y: number }[]; btnWidth: number } {
+  const cols = W > H * 1.2 ? 4 : 2, rows = 4 / cols;
+  const top = -0.265, bottom = 0.215, gap = Math.min(W, H) * 0.035;
+  const tile = Math.floor(Math.min((W * 0.92 - gap * (cols - 1)) / cols, (H * (bottom - top) - gap * (rows - 1)) / rows));
+  const cy = (top + bottom) / 2;
+  const tiles = Array.from({ length: 4 }, (_, i) => ({
+    x: ((i % cols) - (cols - 1) / 2) * (tile + gap) / W,
+    y: cy + (Math.floor(i / cols) - (rows - 1) / 2) * (tile + gap) / H,
+  }));
+  const btnWidth = Math.min(0.2, (tile * cols + gap * (cols - 1)) / W / 4 - 0.02);
+  const span = cols === 4 ? (tile + gap) / W : 0.23;
+  const buttons = Array.from({ length: 4 }, (_, i) => ({ x: (i - 1.5) * span, y: 0.3 }));
+  return { tile, tiles, buttons, btnWidth };
+}
 const INTRO = 1;
 
 const motion = (m: Partial<ClipMotion>): ClipMotion => ({ in: 'pop', out: 'none', loop: 'none', duration: 0.35, speed: 1, ...m });
@@ -176,8 +202,9 @@ export function buildQuiz(p: Project, rounds: QuizRound[], o: QuizOptions): { pr
   q = addUnderlayClip(q, createShapeClip(bgStyle, start0, total));
 
   // Tracks, back to front (clips on one track can't overlap, so each layer gets its own).
-  const names = ['Quiz burst', 'Quiz picture', 'Quiz ring', 'Answer A', 'Answer B', 'Answer C', 'Answer D', 'Right answer', 'Quiz round', 'Quiz title', 'Quiz countdown', 'Intro burst', 'Intro title', 'Intro subtitle'];
-  const T = { burst: 0, picture: 1, ring: 2, answer: 3, right: 7, round: 8, title: 9, countdown: 10, introBurst: 11, introTitle: 12, introSub: 13 };
+  const names = ['Quiz burst', 'Quiz picture', 'Quiz ring', 'Answer A', 'Answer B', 'Answer C', 'Answer D', 'Right answer', 'Quiz round', 'Quiz title', 'Quiz countdown', 'Intro burst', 'Intro title', 'Intro subtitle',
+    'Card A', 'Card B', 'Card C', 'Card D', 'Picture A', 'Picture B', 'Picture C', 'Picture D', 'Letter A', 'Letter B', 'Letter C', 'Letter D', 'Shiny glow', 'Shiny sparkles'];
+  const T = { burst: 0, picture: 1, ring: 2, answer: 3, right: 7, round: 8, title: 9, countdown: 10, introBurst: 11, introTitle: 12, introSub: 13, card: 14, variant: 18, letter: 22, glow: 26, sparkles: 27 };
   const tracks: Track[] = names.map((n) => createTrack('visual', n));
   const put = (i: number, c: Clip) => { tracks[i].clips.push(c); };
   const audio: Clip[] = [], swoosh: Clip[] = [], voice: Clip[] = [];
@@ -221,14 +248,72 @@ export function buildQuiz(p: Project, rounds: QuizRound[], o: QuizOptions): { pr
     snd(o.sounds.sting, start0); // builds for 0.38 s, then hits as the title lands
   }
   // Starburst behind the picture for every round.
-  if (o.burst && rounds.length) {
+  if (o.burst && rounds.length && o.kind !== 'shiny') {
     const b = createShapeClip(burstStyle(q, W * 0.98), roundsStart, len * rounds.length);
     b.transform = { ...b.transform, y: -0.02 };
     b.motion = motion({ in: intro ? 'fade' : 'zoom', duration: intro ? FADE : 0.35 });
     put(T.burst, b);
   }
 
-  rounds.forEach((r, k) => {
+  const shiny = o.kind === 'shiny';
+  if (shiny) rounds.forEach((r, k) => {
+    const s = roundsStart + k * len, thinkEnd = s + INTRO + o.thinkSeconds, H = p.settings.height;
+    const L = shinyLayout(W, H), navy = '#1b2a57';
+    const firstIn: Partial<ClipMotion> = intro ? { in: 'fade', duration: FADE } : { in: 'slam', duration: 0.7 };
+    put(T.title, text(s, len, -0.37, 0, { ...titleStyle, fontSize: Math.round(W * 0.085) }, k === 0 ? firstIn : { in: 'pop', duration: 0.35 }));
+    if (o.showRound) put(T.round, text(s + 0.15, len - 0.15, -0.298, 0, { content: `Round ${o.firstRound + k}`, fontFamily: 'Archivo Black', fontSize: Math.round(W * 0.036), color: '#ffffff', strokeColor: '#1f4fb8', strokeWidth: 5 }, { in: 'fade' }));
+    // At the reveal the three wrong ones fade back so the real shiny stands out.
+    const dim = (c: Clip, wrong: boolean) => { if (wrong) c.keyframes = { ...c.keyframes, opacity: [{ t: 0, v: 1, ease: 'hold' }, { t: thinkEnd - c.start, v: 1, ease: 'easeOut' }, { t: thinkEnd - c.start + 0.4, v: 0.3, ease: 'linear' }] }; return c; };
+    (r.variants ?? []).slice(0, 4).forEach((m, i) => {
+      const { x, y } = L.tiles[i], wrong = i !== r.correct, at = s + 0.25 + i * 0.1;
+      const card = createShapeClip({ ...defaultShape('rect'), width: L.tile, height: L.tile, radius: L.tile * 0.1, fill: '#ffffff', fill2: '#dfeaff', stroke: navy, strokeWidth: 7, shadow: 10 }, at, s + len - at);
+      card.name = `Card ${'ABCD'[i]}`;
+      card.transform = { ...card.transform, x, y };
+      card.motion = motion({ in: 'pop' });
+      put(T.card + i, dim(card, wrong));
+      const pic = createClipFromMedia(m, at + 0.08);
+      pic.duration = s + len - pic.start;
+      pic.fit = 'contain';
+      pic.transform = { ...pic.transform, x, y, scale: pictureScale(q, m, L.tile * 0.8) };
+      pic.motion = motion({ in: 'pop' });
+      put(T.variant + i, dim(pic, wrong));
+      // Letter badge on the card's top-left corner.
+      const badge = text(at + 0.12, s + len - at - 0.12, y - (L.tile * 0.36) / H, x - (L.tile * 0.36) / W,
+        { content: 'ABCD'[i], fontFamily: 'Archivo Black', fontSize: Math.round(L.tile * 0.13), color: navy, background: o.accent, backgroundBorder: navy, backgroundBorderWidth: 5, backgroundPadding: Math.round(L.tile * 0.035), backgroundRadius: Math.round(L.tile * 0.05), backgroundFull: true, boxWidth: (L.tile * 0.11) / W, align: 'center' }, { in: 'pop' });
+      put(T.letter + i, dim(badge, wrong));
+      // Answer buttons: plain A–D; the right one turns solid green with white text.
+      const b = L.buttons[i], bs = s + 0.6 + i * 0.08;
+      const base: Partial<TextStyle> = { content: 'ABCD'[i], fontFamily: 'Archivo Black', fontSize: Math.round(W * 0.055), color: navy, background: '#ffffff', backgroundBorder: navy, backgroundBorderWidth: 5, backgroundPadding: 20, backgroundRadius: 28, backgroundFull: true, boxWidth: L.btnWidth - BTN_EDGE, align: 'center' };
+      const end = wrong ? s + len : thinkEnd + 0.2;
+      put(T.answer + i, dim(text(bs, end - bs, b.y, b.x, base, { in: 'pop' }), wrong));
+      if (!wrong) {
+        put(T.right, text(thinkEnd, s + len - thinkEnd, b.y, b.x, { ...base, background: SHINY_GREEN, backgroundBorder: '#ffffff', color: '#ffffff' }, { in: 'pop', loop: 'pulse', speed: 0.8 }));
+        const glow = createShapeClip({ ...defaultShape('rect'), width: L.tile, height: L.tile, radius: L.tile * 0.1, fill: 'transparent', stroke: SHINY_GREEN, strokeWidth: 16, glow: 34, glowColor: SHINY_GREEN }, thinkEnd, s + len - thinkEnd);
+        glow.name = 'Shiny glow';
+        glow.transform = { ...glow.transform, x, y };
+        glow.motion = motion({ in: 'pop', loop: 'pulse', speed: 0.8 });
+        put(T.glow, glow);
+        const sp = createShapeClip({ ...defaultShape('sparkles'), width: L.tile * 1.3, height: L.tile * 1.3 }, thinkEnd, s + len - thinkEnd);
+        sp.name = 'Shiny sparkles';
+        sp.transform = { ...sp.transform, x, y };
+        sp.motion = motion({ in: 'fade', duration: 0.2 });
+        put(T.sparkles, sp);
+      }
+    });
+    if (o.countdown !== 'none') {
+      const cd = createShapeClip(o.countdown === 'bar'
+        ? { ...defaultShape('countdown'), countStyle: 'bar', width: W * 0.74, height: 36, radius: 18, fill: 'rgba(0,0,0,0.35)', stroke: o.accent }
+        : { ...defaultShape('countdown'), width: W * 0.16, height: W * 0.16, stroke: o.accent }, s + INTRO, o.thinkSeconds);
+      cd.transform = { ...cd.transform, y: o.countdown === 'bar' ? 0.385 : 0.4 };
+      cd.motion = motion({ in: 'fade', out: 'fade', duration: 0.2 });
+      put(T.countdown, cd);
+    }
+    snd(o.sounds.whoosh, s, swoosh);
+    for (let i = 0; i < Math.floor(o.thinkSeconds); i++) snd(i % 2 && o.sounds.tock ? o.sounds.tock : o.sounds.tick, s + INTRO + i);
+    snd(o.sounds.sparkle ?? o.sounds.ding, thinkEnd);
+  });
+
+  if (!shiny) rounds.forEach((r, k) => {
     const s = roundsStart + k * len;
     const thinkEnd = s + INTRO + o.thinkSeconds;
     // Titles

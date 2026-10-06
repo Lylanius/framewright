@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { createShapeClip, createTextClip, defaultShape } from '../../src/core/defaults';
 import { motionState } from '../../src/core/motion';
 import { parseProject, serializeProject } from '../../src/core/projectIO';
-import { answerScale, answerSlots, buildQuiz, introSubtitle, fitAnswerScale, DEFAULT_QUIZ, introLength, pictureScale, quizLength, roundLength, zoomCrop } from '../../src/core/quiz';
+import { answerScale, answerSlots, buildQuiz, introSubtitle, shinyLayout, SHINY_GREEN, fitAnswerScale, DEFAULT_QUIZ, introLength, pictureScale, quizLength, roundLength, zoomCrop } from '../../src/core/quiz';
 import { valueAt } from '../../src/core/keyframes';
 import { maskValue } from '../../src/core/masks';
 import { SFX, wavBytes } from '../../src/core/sfx';
+import { mainHue, pickFakeShifts, recolour } from '../../src/core/shinyFakes';
 import { tidyVoice, toMono } from '../../src/core/voiceTrim';
 import { alignBox, distribute, snapBox } from '../../src/core/snap';
 import { addOverlayClip, addUnderlayClip, findClip, mainTrackIndex, moveClipLayer, projectDuration } from '../../src/core/timeline';
@@ -203,6 +204,56 @@ describe('quiz maker', () => {
     expect(build({ introSub: 'custom', introText: 'Gen 1 edition' }).find((c) => c.name === 'Intro subtitle')!.text!.content).toBe('Gen 1 edition');
     expect(build({ introSub: 'none' }).some((c) => c.name === 'Intro subtitle')).toBe(false);
     expect(build({ introSub: 'custom', introText: '  ' }).some((c) => c.name === 'Intro subtitle')).toBe(false);
+  });
+  it('spot the real shiny: four cards A–D, the real one sparkles and its button turns green', () => {
+    const { p } = sampleProject();
+    const four = ['N', 'S', 'F1', 'F2'].map((id) => pic(id));
+    const empty = { ...p, tracks: p.tracks.map((t) => ({ ...t, clips: [] })), media: four };
+    const o = { ...DEFAULT_QUIZ, kind: 'shiny' as const, title: 'SPOT THE\nREAL SHINY!', intro: false, sounds: {} };
+    const r = buildQuiz(empty, [{ picture: four[0], answers: [], correct: 2, variants: four }], o);
+    const all = r.project.tracks.flatMap((t) => t.clips);
+    const thinkEnd = 1 + o.thinkSeconds;
+    // Four pictures, each on its own card, laid out 2 × 2 inside the frame.
+    const pics = four.map((m) => all.find((c) => c.mediaId === m.id)!);
+    expect(new Set(pics.map((c) => `${c.transform.x.toFixed(2)},${c.transform.y.toFixed(2)}`)).size).toBe(4);
+    const { width: W, height: H } = empty.settings;
+    const L = shinyLayout(W, H);
+    for (const t of L.tiles) { expect(Math.abs(t.x) + L.tile / 2 / W).toBeLessThan(0.5); expect(Math.abs(t.y) + L.tile / 2 / H).toBeLessThan(0.3); }
+    expect(shinyLayout(1920, 1080).tiles.every((t) => t.y === shinyLayout(1920, 1080).tiles[0].y)).toBe(true); // wide video: one row
+    // Letters A–D as badges, plus A–D buttons.
+    for (const ch of 'ABCD') expect(all.filter((c) => c.text?.content === ch).length).toBeGreaterThanOrEqual(2);
+    // Reveal: wrong pictures fade back, the right one doesn't.
+    pics.forEach((c, i) => expect(!!c.keyframes.opacity).toBe(i !== 2));
+    // Winning button: solid green with white text, replacing the white one.
+    const green = all.find((c) => c.text?.background === SHINY_GREEN)!;
+    expect(SHINY_GREEN).toBe('#00E676');
+    expect(green.text).toMatchObject({ content: 'C', color: '#ffffff' });
+    expect(green.start).toBeCloseTo(thinkEnd);
+    // Sparkles + glow on the right card, from the reveal.
+    const sp = all.find((c) => c.shape?.type === 'sparkles')!;
+    expect(sp.start).toBeCloseTo(thinkEnd);
+    expect(sp.transform.x).toBeCloseTo(pics[2].transform.x);
+    expect(sp.transform.y).toBeCloseTo(pics[2].transform.y);
+    expect(all.find((c) => c.name === 'Shiny glow')!.shape!.stroke).toBe(SHINY_GREEN);
+    for (const t of r.project.tracks) { const cs = [...t.clips].sort((a, b) => a.start - b.start); for (let i = 1; i < cs.length; i++) expect(cs[i].start).toBeGreaterThanOrEqual(cs[i - 1].start + cs[i - 1].duration - 1e-6); }
+  });
+  it('shiny decoys: colours picked well away from the normal and the real shiny', () => {
+    for (const shift of [0, 40, 120, 180, 300]) {
+      const [a, b] = pickFakeShifts(shift);
+      const far = (x: number, y: number) => { const d = Math.abs(x - y) % 360; return Math.min(d, 360 - d); };
+      for (const d of [far(a, 0), far(b, 0), far(a, shift), far(b, shift), far(a, b)]) expect(d, `shift ${shift}`).toBeGreaterThanOrEqual(75);
+    }
+    // An orange pixel turned 120° becomes green; see-through pixels are left alone.
+    const px = new Uint8ClampedArray([255, 128, 0, 255, 10, 20, 30, 0]);
+    expect(mainHue(px).hue).toBeCloseTo(30, 0);
+    recolour(px, 120);
+    expect(px[1]).toBeGreaterThan(px[0]);
+    expect(Array.from(px.slice(4))).toEqual([10, 20, 30, 0]);
+    // A grey character has no colour to turn, so it's tinted instead.
+    const grey = new Uint8ClampedArray([128, 128, 128, 255]);
+    expect(mainHue(grey).saturation).toBe(0);
+    recolour(grey, 240, true);
+    expect(grey[2]).toBeGreaterThan(grey[0] + 30);
   });
   it('adds an intro that slams the title in, then crossfades into round 1', () => {
     const { p } = sampleProject();

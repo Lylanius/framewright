@@ -223,7 +223,7 @@ export interface TextStyle {
 }
 
 export type ShapeType = 'rect' | 'ellipse' | 'triangle' | 'star' | 'heart' | 'arrow' | 'line' | 'bubble' | 'burst' | 'emoji'
-  | 'speedlines' | 'rays' | 'dots' | 'gradient' | 'streaks' | 'starburst' | 'countdown';
+  | 'speedlines' | 'rays' | 'dots' | 'gradient' | 'streaks' | 'starburst' | 'countdown' | 'sparkles';
 
 /** Vector shape / emoji sticker. Sizes are in project pixels. */
 export interface ShapeStyle {

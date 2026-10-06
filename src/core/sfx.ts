@@ -69,6 +69,17 @@ export const SFX: SfxDef[] = [
     make: (r) => render(1.5, r, 0.8, (t) => 0.8 * bell(t, 880, 0.25) + bell(t - 0.11, 1318.5, 0.5)),
   },
   {
+    id: 'sparkle', name: 'Sparkle', description: 'Glittery shimmer for a shiny reveal.', seconds: 1.6,
+    make: (r) => {
+      const notes = [1568, 2093, 2637, 3136, 2349, 3520, 4186]; // quick run of high bells
+      return render(1.6, r, 0.7, (t) => {
+        let v = 0.7 * bell(t, 1046.5, 0.5);
+        notes.forEach((hz, i) => { v += 0.55 * bell(t - 0.03 - i * 0.055, hz, 0.22) * (1 - i * 0.07); });
+        return v;
+      });
+    },
+  },
+  {
     id: 'buzzer', name: 'Buzzer (wrong)', description: 'Low buzz for a wrong answer.', seconds: 0.6,
     make: (r) => {
       const lp = biquad('lp', r);

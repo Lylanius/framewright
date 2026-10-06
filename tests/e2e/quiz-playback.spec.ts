@@ -192,3 +192,36 @@ test('a quiz video opens on the title card, so that is its cover', async ({ page
   });
   expect(yellow).toBeGreaterThan(150);
 });
+
+test('spot the real shiny: two pictures in, decoys made, four-card quiz out', async ({ page, isMobile }) => {
+  test.setTimeout(150_000);
+  const tag = isMobile ? 'phone' : 'desktop';
+  await page.goto('/');
+  await openQuizMaker(page, isMobile);
+  await page.getByRole('radio', { name: 'Spot the real shiny' }).click();
+  await expect(page.getByLabel('Quiz title')).toHaveValue('SPOT THE\nREAL SHINY!');
+  await page.getByLabel('Round 1 normal file').setInputFiles(f('creature.png'));
+  await page.getByLabel('Round 1 real shiny file').setInputFiles(f('creature-shiny.png'));
+  // Both decoys appear by themselves, and the answer letter is shown.
+  await expect(page.locator('.shiny-slot img')).toHaveCount(4, { timeout: 20_000 });
+  await expect(page.locator('.shiny-answer')).toContainText(/Real shiny is [ABCD]/);
+  await page.locator('.shiny-round').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `test-results/shiny-maker-${tag}.png` });
+  await page.getByRole('button', { name: /Add 1 round/ }).click();
+  await expect(page.locator('.toast', { hasText: /Made 1 quiz round/ })).toBeVisible({ timeout: 60_000 });
+  const info = await page.evaluate(() => {
+    const p = (window as any).__fw.app.getState().project;
+    const clips = p.tracks.flatMap((t: any) => t.clips);
+    return { media: p.media.filter((m: any) => m.kind === 'image').length, sparkles: clips.filter((c: any) => c.shape?.type === 'sparkles').length, green: clips.filter((c: any) => c.text?.background === '#00E676').length, sfx: clips.some((c: any) => /Sparkle/.test(c.name)) };
+  });
+  expect(info).toEqual({ media: 4, sparkles: 1, green: 1, sfx: true });
+  const canvas = page.locator('.preview canvas, canvas.preview-canvas, .stage canvas').first();
+  const shot = async (t: number, name: string) => {
+    await page.evaluate((time) => { (window as any).__fw.time.getState().setTime(time); (window as any).__fw.app.getState().player?.seek(time); }, t);
+    await page.waitForTimeout(1200);
+    await page.locator('.toast').evaluateAll((els) => els.forEach((e) => ((e as HTMLElement).style.display = 'none')));
+    await canvas.screenshot({ path: `test-results/shiny-${name}-${tag}.png` });
+  };
+  await shot(5, 'question');
+  await shot(10, 'reveal');
+});

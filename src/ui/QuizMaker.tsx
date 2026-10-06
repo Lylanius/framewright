@@ -1,6 +1,6 @@
 /** Quiz maker dialog: questions in → finished quiz rounds on the timeline. */
 import { useEffect, useRef, useState } from 'react';
-import { buildQuiz, DEFAULT_QUIZ, quizLength, type HideMode, type QuizOptions, type QuizRound } from '../core/quiz';
+import { buildQuiz, DEFAULT_QUIZ, quizLength, SHINY_TITLE, type HideMode, type QuizOptions, type QuizRound } from '../core/quiz';
 import { SFX, sfxFile } from '../core/sfx';
 import { formatShort } from '../core/time';
 import type { MediaItem } from '../core/types';
@@ -8,6 +8,7 @@ import { Dialog, PropRow, Seg } from './components/Controls';
 import { Icon } from './components/Icon';
 import { QuizPreview } from './QuizPreview';
 import { suggestFocus } from './quizFocus';
+import { blankShiny, shinyCorrect, shinyReady, ShinyRounds, type ShinyDraft } from './ShinyRounds';
 import { VoiceRecorder } from './VoiceRecorder';
 import { ZoomEditor } from './ZoomEditor';
 import { useApp, useTime } from './store';
@@ -58,7 +59,9 @@ const playSfx = (id: string) => { const d = SFX.find((x) => x.id === id); if (d)
 
 export function QuizMaker({ onClose }: { onClose: () => void }) {
   const { importFiles, apply, toast } = useApp();
-  const [opts, setOpts] = useState({ ...DEFAULT_QUIZ, sounds: true });
+  const [opts, setOpts] = useState({ ...DEFAULT_QUIZ, kind: 'guess' as 'guess' | 'shiny', sounds: true });
+  const [shinyRounds, setShinyRounds] = useState<ShinyDraft[]>(() => [blankShiny()]);
+  const isShiny = opts.kind === 'shiny';
   const [rounds, setRounds] = useState<Draft[]>([blank()]);
   const [busy, setBusy] = useState(false);
   const [active, setActive] = useState<number | null>(null); // round shown in the preview
@@ -83,26 +86,38 @@ export function QuizMaker({ onClose }: { onClose: () => void }) {
   const shownIndex = Math.max(0, rounds.findIndex((r) => r.id === active));
   const shown = rounds[shownIndex] ?? rounds[0];
   const ready = rounds.filter((r) => r.file && r.answers.filter((a) => a.trim()).length >= 2);
+  const shinyOk = shinyRounds.filter(shinyReady);
+  const readyCount = isShiny ? shinyOk.length : ready.length;
+  const shinyShownIndex = Math.max(0, shinyRounds.findIndex((r) => r.id === active));
+  const shinyShown = shinyRounds[shinyShownIndex] ?? shinyRounds[0];
+  // Switching quiz type swaps the title too, unless you've typed your own.
+  const setKind = (kind: 'guess' | 'shiny') => set({ kind, title: opts.title === DEFAULT_QUIZ.title || opts.title === SHINY_TITLE ? (kind === 'shiny' ? SHINY_TITLE : DEFAULT_QUIZ.title) : opts.title });
 
   const make = async () => {
-    if (!ready.length) { toast('Each round needs a picture and at least two answers.'); return; }
+    if (!readyCount) { toast(isShiny ? 'Each round needs the normal picture and the real shiny.' : 'Each round needs a picture and at least two answers.'); return; }
     setBusy(true);
     try {
       // One at a time so each round keeps its own picture even if one file fails.
       const picIds: (string | undefined)[] = [];
-      for (const r of ready) picIds.push((await importFiles([r.file!]))[0]);
+      if (!isShiny) for (const r of ready) picIds.push((await importFiles([r.file!]))[0]);
+      // Spot the shiny: four pictures a round, imported in the order they're shown (A–D).
+      const shinyIds: (string | undefined)[][] = [];
+      if (isShiny) for (const r of shinyOk) { const ids: (string | undefined)[] = []; for (const src of r.order) ids.push((await importFiles([r.files[src]!]))[0]); shinyIds.push(ids); }
       const sfxIds: (string | undefined)[] = [];
       const introId = opts.intro && opts.introSound !== 'none' ? opts.introSound : null;
-      if (opts.sounds) for (const id of ['tick', 'tock', 'ding', 'whoosh', ...(introId ? [introId] : [])]) sfxIds.push((await importFiles([sfxFile(SFX.find((x) => x.id === id)!)]))[0]);
+      if (opts.sounds) for (const id of ['tick', 'tock', isShiny ? 'sparkle' : 'ding', 'whoosh', ...(introId ? [introId] : [])]) sfxIds.push((await importFiles([sfxFile(SFX.find((x) => x.id === id)!)]))[0]);
       const voiceId = opts.intro && voice ? (await importFiles([voice]))[0] : undefined;
       const media = useApp.getState().project!.media;
       const byId = (id?: string) => media.find((m) => m.id === id) as MediaItem | undefined;
-      const qr: QuizRound[] = ready.map((r, i) => {
+      const qr: QuizRound[] = isShiny ? shinyOk.map((r, i) => {
+        const variants = shinyIds[i].map((id) => byId(id)).filter(Boolean) as MediaItem[];
+        return { picture: variants[0], answers: [], correct: shinyCorrect(r), variants };
+      }).filter((r) => r.variants!.length === 4) : ready.map((r, i) => {
         const answers = r.answers.map((a) => a.trim()).filter(Boolean);
         const correctText = r.answers[r.correct]?.trim();
         return { picture: byId(picIds[i])!, answers, correct: Math.max(0, answers.indexOf(correctText ?? '')), focus: r.focus, zoom: r.zoom };
       }).filter((r) => r.picture);
-      const o: QuizOptions = { ...opts, sounds: { tick: byId(sfxIds[0]), tock: byId(sfxIds[1]), ding: byId(sfxIds[2]), whoosh: byId(sfxIds[3]), boom: introId === 'boom' ? byId(sfxIds[4]) : undefined, sting: introId === 'sting' ? byId(sfxIds[4]) : undefined, introVoice: byId(voiceId) } };
+      const o: QuizOptions = { ...opts, sounds: { tick: byId(sfxIds[0]), tock: byId(sfxIds[1]), ding: isShiny ? undefined : byId(sfxIds[2]), sparkle: isShiny ? byId(sfxIds[2]) : undefined, whoosh: byId(sfxIds[3]), boom: introId === 'boom' ? byId(sfxIds[4]) : undefined, sting: introId === 'sting' ? byId(sfxIds[4]) : undefined, introVoice: byId(voiceId) } };
       let start = 0;
       apply(`Quiz: ${qr.length} round${qr.length === 1 ? '' : 's'}`, (p) => { const r = buildQuiz(p, qr, o); start = r.start; return r.project; });
       useTime.getState().setTime(start);
@@ -117,15 +132,19 @@ export function QuizMaker({ onClose }: { onClose: () => void }) {
 
   return (
     <Dialog title="Quiz maker" onClose={onClose} width={1000} footer={<>
-      <span className="faint" style={{ marginRight: 'auto', fontSize: 12, alignSelf: 'center' }}>{ready.length} round{ready.length === 1 ? '' : 's'} ready · {formatShort(quizLength(opts, ready.length))}</span>
+      <span className="faint" style={{ marginRight: 'auto', fontSize: 12, alignSelf: 'center' }}>{readyCount} round{readyCount === 1 ? '' : 's'} ready · {formatShort(quizLength(opts, readyCount))}</span>
       <button className="btn" onClick={onClose}>Cancel</button>
-      <button className="btn primary" disabled={busy || !ready.length} onClick={() => void make()}><Icon name="plus" size={15} />{busy ? 'Making…' : `Add ${ready.length || ''} round${ready.length === 1 ? '' : 's'} to the video`}</button>
+      <button className="btn primary" disabled={busy || !readyCount} onClick={() => void make()}><Icon name="plus" size={15} />{busy ? 'Making…' : `Add ${readyCount || ''} round${readyCount === 1 ? '' : 's'} to the video`}</button>
     </>}>
       <div className="quiz-grid">
         <div className="quiz-preview-col">
-          {settings && <QuizPreview settings={settings} opts={look} round={shown} roundNumber={opts.firstRound + shownIndex} />}
+          {settings && <QuizPreview settings={settings} opts={look} round={shown} roundNumber={opts.firstRound + (isShiny ? shinyShownIndex : shownIndex)}
+            shiny={isShiny ? { urls: shinyShown.order.map((src) => shinyShown.urls[src]), correct: shinyCorrect(shinyShown) } : undefined} />}
         </div>
         <div className="quiz-opts">
+          <div className="field"><span>Quiz type</span>
+            <Seg label="Quiz type" value={opts.kind} onChange={(v: 'guess' | 'shiny') => setKind(v)} options={[{ value: 'guess', label: 'Who’s that?' }, { value: 'shiny', label: 'Spot the real shiny' }]} />
+          </div>
           <label className="field"><span>Title (shown every round)</span>
             <textarea className="input" rows={2} value={opts.title} onChange={(e) => set({ title: e.target.value })} aria-label="Quiz title" />
           </label>
@@ -167,6 +186,7 @@ export function QuizMaker({ onClose }: { onClose: () => void }) {
           )}
           <PropRow label="Thinking time" value={opts.thinkSeconds} min={2} max={15} step={1} unit="s" onChange={(v) => set({ thinkSeconds: v })} />
           <PropRow label="Reveal time" value={opts.revealSeconds} min={1} max={8} step={0.5} unit="s" onChange={(v) => set({ revealSeconds: v })} />
+          {!isShiny && <>
           <label className="field"><span>Hide the picture with</span>
             <Seg label="Hide the picture with" value={opts.hide} onChange={(v: HideMode) => set({ hide: v })} options={[{ value: 'zoom', label: 'Zoom' }, { value: 'silhouette', label: 'Silhouette' }, { value: 'blur', label: 'Blur' }, { value: 'pixelate', label: 'Pixels' }, { value: 'none', label: 'Nothing' }]} />
           </label>
@@ -175,23 +195,27 @@ export function QuizMaker({ onClose }: { onClose: () => void }) {
             <small className="faint">The question shows a close-up, then zooms out to reveal. Tap <b>Close-up</b> on each picture to choose exactly which part to show and how close.</small>
           </>}
           {opts.hide === 'silhouette' && <small className="faint">Silhouettes need pictures with a see-through background (PNG). For photos, pick Blur or Pixels.</small>}
+          </>}
           <label className="field"><span>Background</span>
             <Seg label="Background" value={opts.background} onChange={(v: QuizOptions['background']) => set({ background: v })} options={[{ value: 'streaks', label: 'Streaks' }, { value: 'speedlines', label: 'Speed lines' }, { value: 'rays', label: 'Sunburst' }, { value: 'dots', label: 'Dots' }, { value: 'gradient', label: 'Gradient' }]} />
           </label>
-          <label className="row"><input type="checkbox" checked={opts.burst} onChange={() => set({ burst: !opts.burst })} /> Starburst behind the picture</label>
+          {!isShiny && <label className="row"><input type="checkbox" checked={opts.burst} onChange={() => set({ burst: !opts.burst })} /> Starburst behind the picture</label>}
           <div className="row" style={{ gap: 14 }}>
             <label className="row" style={{ fontSize: 13 }}><input type="color" className="swatch" value={opts.bgColour} onChange={(e) => set({ bgColour: e.target.value })} aria-label="Background colour" />Background</label>
             <label className="row" style={{ fontSize: 13 }}><input type="color" className="swatch" value={opts.accent} onChange={(e) => set({ accent: e.target.value })} aria-label="Title colour" />Title & letters</label>
           </div>
+          {!isShiny && <>
           <label className="field"><span>Answers</span>
             <Seg label="Answer layout" value={opts.answerLayout} onChange={(v: QuizOptions['answerLayout']) => set({ answerLayout: v })} options={[{ value: 'grid', label: '2 × 2 grid' }, { value: 'list', label: 'One per row' }]} />
           </label>
           <PropRow label="Answer size" value={Math.round(opts.answerSize * 100)} min={70} max={160} step={5} unit="%" onChange={(v) => set({ answerSize: v / 100 })} />
+          </>}
           <label className="field"><span>Countdown</span>
             <Seg label="Countdown" value={opts.countdown} onChange={(v: QuizOptions['countdown']) => set({ countdown: v })} options={[{ value: 'bar', label: 'Bar' }, { value: 'ring', label: 'Ring' }, { value: 'none', label: 'None' }]} />
           </label>
-          <label className="row"><input type="checkbox" checked={opts.sounds} onChange={() => set({ sounds: !opts.sounds })} /> Sound effects (whoosh, tick-tock, chime{opts.intro ? ', boom' : ''})</label>
+          <label className="row"><input type="checkbox" checked={opts.sounds} onChange={() => set({ sounds: !opts.sounds })} /> Sound effects (whoosh, tick-tock, {isShiny ? 'sparkle' : 'chime'}{opts.intro ? ', boom' : ''})</label>
         </div>
+        {isShiny ? <ShinyRounds rounds={shinyRounds} setRounds={setShinyRounds} firstRound={opts.firstRound} activeId={shinyShown.id} onActive={setActive} onError={(m) => toast(m, 'error')} /> : (
         <div className="quiz-rounds">
           {rounds.map((r, i) => (
             <div key={r.id} className={`quiz-round${r.id === shown.id && rounds.length > 1 ? ' previewing' : ''}`} onFocus={() => setActive(r.id)}>
@@ -227,6 +251,7 @@ export function QuizMaker({ onClose }: { onClose: () => void }) {
           ))}
           <button className="btn" onClick={() => setRounds([...rounds, blank()])}><Icon name="plus" size={14} />Add a round</button>
         </div>
+        )}
       </div>
       {editing !== null && (() => {
         const i = rounds.findIndex((x) => x.id === editing);

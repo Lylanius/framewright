@@ -88,7 +88,7 @@ export function createShapeClip(shape: ShapeStyle, start: number, duration = DEF
   return clip;
 }
 
-const shapeName = (t: ShapeStyle['type']) => ({ rect: 'Rectangle', ellipse: 'Circle', triangle: 'Triangle', star: 'Star', heart: 'Heart', arrow: 'Arrow', line: 'Line', bubble: 'Speech bubble', burst: 'Burst', emoji: 'Emoji', speedlines: 'Speed lines', rays: 'Sunburst', dots: 'Comic dots', gradient: 'Gradient', streaks: 'Streaks', starburst: 'Starburst', countdown: 'Countdown' })[t];
+const shapeName = (t: ShapeStyle['type']) => ({ rect: 'Rectangle', ellipse: 'Circle', triangle: 'Triangle', star: 'Star', heart: 'Heart', arrow: 'Arrow', line: 'Line', bubble: 'Speech bubble', burst: 'Burst', emoji: 'Emoji', speedlines: 'Speed lines', rays: 'Sunburst', dots: 'Comic dots', gradient: 'Gradient', streaks: 'Streaks', starburst: 'Starburst', countdown: 'Countdown', sparkles: 'Sparkles' })[t];
 
 /** Background shapes fill the frame: pass the project size. */
 export const BACKGROUND_SHAPES: ShapeStyle['type'][] = ['speedlines', 'rays', 'dots', 'gradient', 'streaks'];
@@ -103,6 +103,7 @@ export function defaultShape(type: ShapeStyle['type'], frame = { width: 1080, he
     case 'streaks': return { ...base, ...full, fill: '#e3141f', fill2: '#ff6a3c', color2: '#b30a18', angle: -18, animate: true };
     case 'starburst': return { ...base, width: 900, height: 900, fill: '#4f9ff0', fill2: '#ffffff', color2: '#b9ddff', points: 64, animate: true };
     case 'gradient': return { ...base, ...full, fill: '#7a2cff', fill2: '#ff3fa4', gradientKind: 'linear', angle: 160, animate: false };
+    case 'sparkles': return { ...base, width: 520, height: 520, fill: '#ffffff', fill2: '#fff3a0', stroke: 'transparent', strokeWidth: 0, points: 14, animate: true };
     case 'countdown': return { ...base, width: 260, height: 260, fill: 'rgba(0,0,0,0.45)', stroke: '#ffd23f', strokeWidth: 22, textColor: '#ffffff', countStyle: 'ring' };
     case 'arrow': return { ...base, width: 520, height: 260, fill: '#ffffff', stroke: '#111111', strokeWidth: 10 };
     case 'line': return { ...base, width: 640, height: 16, fill: '#ffffff' };

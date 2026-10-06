@@ -13,11 +13,11 @@ const PIC_ID = '__quiz_preview_pic';
 const PREVIEW_W = 190;
 
 /** A friendly stand-in creature (transparent background, so silhouettes work) until a picture is picked. */
-function standIn(): HTMLCanvasElement {
+function standIn(colour = '#7ec8ff'): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = c.height = 400;
   const g = c.getContext('2d')!;
-  g.fillStyle = '#7ec8ff';
+  g.fillStyle = colour;
   g.beginPath(); g.ellipse(200, 235, 130, 125, 0, 0, Math.PI * 2); g.fill();
   g.beginPath(); g.ellipse(110, 110, 38, 70, -0.4, 0, Math.PI * 2); g.fill();
   g.beginPath(); g.ellipse(290, 110, 38, 70, 0.4, 0, Math.PI * 2); g.fill();
@@ -32,7 +32,14 @@ function standIn(): HTMLCanvasElement {
 
 export interface PreviewRound { url: string | null; answers: string[]; correct: number; focus?: { x: number; y: number }; zoom?: number }
 
-export function QuizPreview({ settings, opts, round, roundNumber }: {
+/** Spot the shiny: the four pictures in the order shown (null = not chosen yet) and which is the real one. */
+export interface PreviewShiny { urls: (string | null)[]; correct: number }
+const SHINY_STANDINS = ['#7ec8ff', '#ffb347', '#c58bff', '#7be08a'];
+type Pic = CanvasImageSource & { width: number; height: number };
+const sizeOf = (p: Pic) => ({ width: (p as HTMLImageElement).naturalWidth || p.width, height: (p as HTMLImageElement).naturalHeight || p.height });
+
+export function QuizPreview({ settings, opts, round, roundNumber, shiny }: {
+  shiny?: PreviewShiny;
   settings: ProjectSettings;
   opts: Omit<QuizOptions, 'sounds'>;
   round: PreviewRound;
@@ -51,6 +58,21 @@ export function QuizPreview({ settings, opts, round, roundNumber }: {
     img.src = round.url;
   }, [round.url]);
 
+  // Spot the shiny: four pictures (stand-ins in four colours until yours are chosen).
+  const [four, setFour] = useState<Pic[]>(() => SHINY_STANDINS.map((c) => standIn(c)));
+  const urlKey = shiny?.urls.join('|') ?? '';
+  useEffect(() => {
+    if (!shiny) return;
+    let live = true;
+    shiny.urls.forEach((u, i) => {
+      if (!u) { setFour((f) => f.map((x, k) => (k === i ? standIn(SHINY_STANDINS[i]) : x))); return; }
+      const img = new Image();
+      img.onload = () => { if (live) setFour((f) => f.map((x, k) => (k === i ? img : x))); };
+      img.src = u;
+    });
+    return () => { live = false; };
+  }, [urlKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const len = quizLength(opts, 1);
   const intro = introLength(opts);
   const project = useMemo(() => {
@@ -60,11 +82,15 @@ export function QuizPreview({ settings, opts, round, roundNumber }: {
       hasAudio: false, fingerprint: PIC_ID, importedAt: 0,
     };
     const base = createProject('Quiz preview', settings);
+    if (shiny) {
+      const variants: MediaItem[] = four.map((f, i) => ({ ...picture, id: `${PIC_ID}${i}`, fingerprint: `${PIC_ID}${i}`, ...sizeOf(f) }));
+      return buildQuiz({ ...base, media: variants }, [{ picture: variants[0], answers: [], correct: shiny.correct, variants }], { ...opts, firstRound: roundNumber, sounds: {} }).project;
+    }
     const filled = round.answers.map((a, i) => a.trim() || (i < 2 ? `Answer ${'ABCD'[i]}` : '')).filter(Boolean);
     const correctText = round.answers[round.correct]?.trim() || `Answer ${'ABCD'[round.correct]}`;
     const p0 = { ...base, media: [picture] };
     return buildQuiz(p0, [{ picture, answers: filled, correct: Math.max(0, filled.indexOf(correctText)), focus: round.url ? round.focus : { x: 0.72, y: 0.18 }, zoom: round.url ? round.zoom : undefined }], { ...opts, firstRound: roundNumber, sounds: {} }).project;
-  }, [settings, opts, round.answers, round.correct, round.focus, round.zoom, round.url, pic, roundNumber]);
+  }, [settings, opts, round.answers, round.correct, round.focus, round.zoom, round.url, pic, roundNumber, four, shiny?.correct, !!shiny]);
 
   const scale = (settings.height >= settings.width ? PREVIEW_W : 300) / settings.width;
   const W = Math.round(settings.width * scale), H = Math.round(settings.height * scale);
@@ -73,7 +99,11 @@ export function QuizPreview({ settings, opts, round, roundNumber }: {
     const c = canvasRef.current;
     if (!c) return;
     const ctx = c.getContext('2d')!;
-    const sources = { getVisual: (clip: { mediaId?: string }) => (clip.mediaId === PIC_ID ? { src: pic, width: (pic as HTMLImageElement).naturalWidth || pic.width, height: (pic as HTMLImageElement).naturalHeight || pic.height } : null) };
+    const sources = { getVisual: (clip: { mediaId?: string }) => {
+      if (clip.mediaId === PIC_ID) return { src: pic, ...sizeOf(pic) };
+      const i = clip.mediaId?.startsWith(PIC_ID) ? +clip.mediaId.slice(PIC_ID.length) : -1;
+      return four[i] ? { src: four[i], ...sizeOf(four[i]) } : null;
+    } };
     let raf = 0, last = performance.now(), lastUi = 0;
     const draw = (now: number) => {
       if (playing) timeRef.current = (timeRef.current + (now - last) / 1000) % len;
@@ -84,7 +114,7 @@ export function QuizPreview({ settings, opts, round, roundNumber }: {
     };
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [project, playing, len, scale, pic]);
+  }, [project, playing, len, scale, pic, four]);
 
   const thinkEnd = (intro + 1 + opts.thinkSeconds) / len;
   const jump = (sec: number) => { timeRef.current = Math.min(len - 0.01, sec); setProgress(timeRef.current / len); };
@@ -102,7 +132,7 @@ export function QuizPreview({ settings, opts, round, roundNumber }: {
         <button className="btn sm ghost" onClick={() => jump(intro + 1 + opts.thinkSeconds * 0.4)}>Question</button>
         <button className="btn sm ghost" onClick={() => jump(intro + 1 + opts.thinkSeconds + 1)}>Answer</button>
       </div>
-      <small className="faint">Live preview{round.url ? '' : ' — pick a picture to see yours'}</small>
+      <small className="faint">Live preview{(shiny ? shiny.urls.every(Boolean) : round.url) ? '' : ' — pick a picture to see yours'}</small>
     </div>
   );
 }

@@ -61,7 +61,7 @@ export function shapePath(ctx: CanvasRenderingContext2D, s: ShapeStyle, w: numbe
 /** Shape/emoji layer at render scale `S` (cached; shapes rarely change between frames). */
 /** Shapes whose picture changes over time. */
 export function isAnimatedShape(s: ShapeStyle): boolean {
-  return s.type === 'countdown' || (!!s.animate && (isBackgroundShape(s) || s.type === 'starburst'));
+  return s.type === 'countdown' || s.type === 'sparkles' || (!!s.animate && (isBackgroundShape(s) || s.type === 'starburst'));
 }
 
 /** Full-frame backgrounds (drawn edge to edge, no padding). */
@@ -105,6 +105,36 @@ function drawStarburst(ctx: CanvasRenderingContext2D, s: ShapeStyle, w: number, 
   glow.addColorStop(0, core); glow.addColorStop(0.7, core); glow.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = glow;
   ctx.beginPath(); ctx.arc(cx, cy, R * 0.38, 0, Math.PI * 2); ctx.fill();
+}
+
+/**
+ * "Shiny" sparkles: four-point stars twinkling around the edge of the box (the
+ * middle is left clear for whatever they're celebrating). Each one fades in,
+ * turns a little and fades out on its own rhythm.
+ */
+function drawSparkles(ctx: CanvasRenderingContext2D, s: ShapeStyle, w: number, h: number, pad: number, t: number): void {
+  const n = Math.max(4, Math.round(s.points ?? 14)), rand = rng(83);
+  const iw = w - pad * 2, ih = h - pad * 2, unit = Math.min(iw, ih);
+  for (let i = 0; i < n; i++) {
+    // Spread round the border: pick a spot on the rectangle's edge, pulled in a little.
+    const u = (i + rand() * 0.8) / n, inset = 0.04 + rand() * 0.16;
+    const per = u * 4, side = Math.floor(per) % 4, f = per - Math.floor(per);
+    const ex = side === 0 ? f : side === 1 ? 1 : side === 2 ? 1 - f : 0, ey = side === 0 ? 0 : side === 1 ? f : side === 2 ? 1 : 1 - f;
+    const x = pad + iw * (ex + (0.5 - ex) * inset * 2), y = pad + ih * (ey + (0.5 - ey) * inset * 2);
+    const size = unit * (0.045 + rand() * 0.075), speed = 1.1 + rand() * 1.3, phase = rand();
+    const cyc = ((s.animate === false ? 0.25 : t * speed) + phase) % 1;
+    const a = Math.sin(Math.PI * cyc) ** 1.5; // twinkle: in and out
+    if (a < 0.02) continue;
+    const r = size * (0.45 + 0.55 * a), rot = cyc * 0.9 + rand() * 0.6;
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(rot); ctx.globalAlpha = a;
+    ctx.shadowColor = s.fill2 ?? '#fff3a0'; ctx.shadowBlur = r * 0.9;
+    ctx.fillStyle = i % 3 === 0 ? (s.fill2 ?? '#fff3a0') : s.fill;
+    ctx.beginPath();
+    for (let k = 0; k < 8; k++) { const rr = k % 2 ? r * 0.22 : r, an = (k / 8) * Math.PI * 2; ctx[k ? 'lineTo' : 'moveTo'](Math.cos(an) * rr, Math.sin(an) * rr); }
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
 }
 
 /** Deterministic pseudo-random numbers (same picture in preview and export). */
@@ -265,6 +295,7 @@ export function renderShapeLayer(s: ShapeStyle, S: number, local = 0, duration =
   if (isBg) drawBackground(ctx, s, w, h, local);
   else if (s.type === 'countdown') drawCountdown(ctx, s, w, h, pad, S, local, duration);
   else if (s.type === 'starburst') drawStarburst(ctx, s, w, h, pad, local);
+  else if (s.type === 'sparkles') drawSparkles(ctx, s, w, h, pad, local);
   else if (s.type === 'emoji') {
     if (s.shadow) { ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = s.shadow * S; ctx.shadowOffsetY = s.shadow * S * 0.3; }
     const size = Math.min(w, h) - pad * 2;
