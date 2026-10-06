@@ -50,9 +50,9 @@ export interface QuizOptions {
 }
 
 export const DEFAULT_QUIZ: Omit<QuizOptions, 'sounds'> = {
-  title: "WHO'S THAT\nCHARACTER?", firstRound: 1, showRound: true, thinkSeconds: 5, revealSeconds: 3,
+  title: "WHO'S THAT\nPOKÉMON?", firstRound: 1, showRound: true, thinkSeconds: 5, revealSeconds: 3,
   hide: 'zoom', zoom: 3.5, background: 'streaks', bgColour: '#e3141f', accent: '#ffd23f', countdown: 'bar', answerSize: 1, answerLayout: 'grid',
-  burst: true, intro: true, introSeconds: 2.5, introSound: 'sting',
+  burst: true, intro: true, introSeconds: 2.5, introSound: 'boom',
 };
 
 const LETTERS = ['A)', 'B)', 'C)', 'D)'];

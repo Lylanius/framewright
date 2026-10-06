@@ -132,7 +132,9 @@ test('record your own intro shout and add the sting', async ({ page, isMobile })
   test.setTimeout(120_000);
   await page.goto('/');
   await openQuizMaker(page, isMobile);
-  await expect(page.getByRole('radio', { name: 'Sting' })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByLabel('Quiz title')).toHaveValue("WHO'S THAT\nPOKÉMON?");
+  await expect(page.getByRole('radio', { name: 'Boom' })).toHaveAttribute('aria-checked', 'true');
+  await page.getByRole('radio', { name: 'Sting' }).click();
   // The test browser's fake microphone plays a beep.
   await page.getByRole('button', { name: 'Record your voice' }).click();
   await page.waitForTimeout(1500);

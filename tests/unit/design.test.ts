@@ -165,7 +165,8 @@ describe('quiz maker', () => {
     const all = r.project.tracks.flatMap((t) => t.clips);
     expect(all.find((c) => c.mediaId === 'sting')!.start).toBeCloseTo(before);
     expect(all.find((c) => c.mediaId === 'voice')!.start).toBeCloseTo(before + 0.4);
-    expect(DEFAULT_QUIZ.introSound).toBe('sting');
+    expect(DEFAULT_QUIZ.introSound).toBe('boom');
+    expect(DEFAULT_QUIZ.title).toBe("WHO'S THAT\nPOKÉMON?");
   });
   it('adds an intro that slams the title in, then crossfades into round 1', () => {
     const { p } = sampleProject();

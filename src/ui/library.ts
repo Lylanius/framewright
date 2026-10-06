@@ -79,7 +79,7 @@ export function addDesignText(style: Partial<TextStyle>, y = 0, x = 0, duration 
 }
 
 export const DESIGN_TEXT: { id: string; name: string; style: Partial<TextStyle>; y: number }[] = [
-  { id: 'quiz-title', name: 'Quiz title', y: -0.34, style: { content: "WHO'S THAT\nCHARACTER?", fontFamily: 'Archivo Black', fontSize: 104, color: '#ffd23f', strokeColor: '#1f4fb8', strokeWidth: 9, shadowBlur: 0, shadowOffsetY: 8, shadowColor: 'rgba(0,0,0,0.35)', uppercase: true, lineHeight: 1.05, animIn: 'pop' } },
+  { id: 'quiz-title', name: 'Quiz title', y: -0.34, style: { content: "WHO'S THAT\nPOKÉMON?", fontFamily: 'Archivo Black', fontSize: 104, color: '#ffd23f', strokeColor: '#1f4fb8', strokeWidth: 9, shadowBlur: 0, shadowOffsetY: 8, shadowColor: 'rgba(0,0,0,0.35)', uppercase: true, lineHeight: 1.05, animIn: 'pop' } },
   { id: 'round', name: 'Round label', y: -0.24, style: { content: 'Round 1', fontFamily: 'Archivo Black', fontSize: 44, color: '#ffd23f', strokeColor: '#1f4fb8', strokeWidth: 5, shadowBlur: 0, animIn: 'fade' } },
   { id: 'answer', name: 'Answer button', y: 0.3, style: { content: '{#e8a200|A)} Answer', fontFamily: 'Archivo Black', fontSize: 44, color: '#1b2a57', background: '#ffffff', backgroundBorder: '#1b2a57', backgroundBorderWidth: 4, backgroundPadding: 18, backgroundRadius: 26, backgroundFull: true, boxWidth: 0.36, align: 'center', shadowBlur: 0, shadowOffsetY: 0, animIn: 'pop' } },
   { id: 'banner', name: 'Banner', y: 0.38, style: { content: 'COMMENT YOUR ANSWER!', fontFamily: 'Archivo Black', fontSize: 52, color: '#ffffff', background: '#e5242b', backgroundPadding: 22, backgroundRadius: 12, backgroundFull: true, boxWidth: 0.82, shadowBlur: 0, shadowOffsetY: 0, animIn: 'slideUp' } },
