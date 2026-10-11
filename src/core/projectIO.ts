@@ -110,5 +110,9 @@ export function parseProject(json: string): Project {
     markers: Array.isArray(raw.markers) ? raw.markers : [],
     magnetic: !!raw.magnetic,
     folder: raw.folder,
+    ...(raw.kids && typeof raw.kids === 'object' ? { kids: {
+      joins: typeof raw.kids.joins === 'string' ? raw.kids.joins : null,
+      music: raw.kids.music && typeof raw.kids.music.mediaId === 'string' ? { mediaId: raw.kids.music.mediaId, volume: num(raw.kids.music.volume, 0.5) } : null,
+    } } : {}),
   };
 }

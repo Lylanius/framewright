@@ -186,5 +186,5 @@ export const TEXT_PRESETS: TextPreset[] = [
 /** Fonts bundled via Google Fonts (all SIL Open Font License). Uploads are added at runtime. */
 export const BUILTIN_FONTS = [
   'Archivo Black', 'Figtree', 'Bangers', 'Monoton', 'Permanent Marker', 'DM Serif Display',
-  'Anton', 'Bebas Neue', 'Poppins', 'Montserrat', 'Oswald', 'Lobster', 'Press Start 2P', 'Rubik Mono One',
+  'Anton', 'Bebas Neue', 'Poppins', 'Montserrat', 'Oswald', 'Lobster', 'Press Start 2P', 'Rubik Mono One', 'Fredoka',
 ];

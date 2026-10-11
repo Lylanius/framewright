@@ -8,9 +8,9 @@ import { wavBytes } from '../core/sfx';
 import { tidyVoice, toMono } from '../core/voiceTrim';
 import { Icon } from './components/Icon';
 
-const MAX_SECONDS = 8;
-
-export function VoiceRecorder({ onDone, onError }: { onDone: (f: File) => void; onError: (msg: string) => void }) {
+export function VoiceRecorder({ onDone, onError, maxSeconds = 8, className = 'btn sm', label = 'Record', fileName = 'Intro voice (recorded).wav' }: {
+  onDone: (f: File) => void; onError: (msg: string) => void; maxSeconds?: number; className?: string; label?: string; fileName?: string;
+}) {
   const [state, setState] = useState<'idle' | 'recording' | 'working'>('idle');
   const [secs, setSecs] = useState(0);
   const rec = useRef<MediaRecorder | null>(null);
@@ -34,7 +34,7 @@ export function VoiceRecorder({ onDone, onError }: { onDone: (f: File) => void; 
       const chans = Array.from({ length: buf.numberOfChannels }, (_, i) => buf.getChannelData(i));
       const clean = tidyVoice(toMono(chans), buf.sampleRate);
       if (clean.length < buf.sampleRate * 0.15) { onError('Didn’t catch anything — try again a little closer to the mic.'); return; }
-      onDone(new File([wavBytes(clean, buf.sampleRate)], 'Intro voice (recorded).wav', { type: 'audio/wav' }));
+      onDone(new File([wavBytes(clean, buf.sampleRate)], fileName, { type: 'audio/wav' }));
     } catch {
       onError('Couldn’t read that recording. Try again, or add a sound file instead.');
     } finally { setState('idle'); }
@@ -61,20 +61,20 @@ export function VoiceRecorder({ onDone, onError }: { onDone: (f: File) => void; 
     timer.current = window.setInterval(() => {
       const s = (performance.now() - t0) / 1000;
       setSecs(s);
-      if (s >= MAX_SECONDS && r.state === 'recording') r.stop();
+      if (s >= maxSeconds && r.state === 'recording') r.stop();
     }, 100);
   };
 
   if (state === 'recording') {
     return (
-      <button className="btn sm danger rec-btn" onClick={() => rec.current?.stop()} aria-label="Stop recording">
+      <button className={`${className} danger rec-btn`} onClick={() => rec.current?.stop()} aria-label="Stop recording">
         <span className="rec-dot" />Stop · {secs.toFixed(1)}s
       </button>
     );
   }
   return (
-    <button className="btn sm" onClick={() => void start()} disabled={state === 'working'} aria-label="Record your voice">
-      <Icon name="audio" size={13} />{state === 'working' ? 'Tidying…' : 'Record'}
+    <button className={className} onClick={() => void start()} disabled={state === 'working'} aria-label="Record your voice">
+      <Icon name="audio" size={13} />{state === 'working' ? 'Tidying…' : label}
     </button>
   );
 }

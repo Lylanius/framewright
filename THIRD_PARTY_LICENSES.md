@@ -29,7 +29,7 @@ Framewright ships (bundles) the following open-source components. All are used u
 ## Fonts
 
 All bundled fonts are under the SIL Open Font License 1.1 except Permanent Marker (Apache-2.0):
-Archivo Black, Figtree, Bangers, Monoton, Permanent Marker, DM Serif Display, Anton, Bebas Neue, Poppins, Montserrat, Oswald, Lobster, Press Start 2P, Rubik Mono One, JetBrains Mono.
+Archivo Black, Figtree, Bangers, Monoton, Permanent Marker, DM Serif Display, Anton, Bebas Neue, Poppins, Montserrat, Oswald, Lobster, Press Start 2P, Rubik Mono One, Fredoka, JetBrains Mono.
 
 ## Models downloaded at run time (not shipped)
 

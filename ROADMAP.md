@@ -163,3 +163,15 @@ Also: **background rendering** (heavy parts of the timeline pre-render while you
 ## Phone polish ✅
 
 Audited every main screen at iPhone size (390 px wide, touch). Fixed: timeline toolbar made the page wider than the screen, which cut off the right edge of every pop-up and slide-up panel (Export button, post editor, Text/Elements/Templates panels); playback bar now uses a short time (0:03.0) so it fits; finger-sized controls on touch screens (buttons, tabs, chips, tick boxes ≥ 36–40 px); 16 px text in all boxes so iPhones don't zoom in when you tap one.
+
+## Kids Studio ✅
+
+| Area | Status | Notes |
+|---|---|---|
+| Entry and lock | Done | One button on the projects screen; grown-up sets the child's name and a 4-number PIN. Stays on after the app is closed. Leaving needs the PIN (forgotten → two-digit long multiplication). Kids only see their own videos. |
+| Editing | Done | Add photos/videos, trim (handles over a filmstrip), split at the playhead, copy, move left/right, delete, speed 0.5–4×, reverse, fill/fit, the clip's own volume, 11 filters (one clip or all), 7 transitions, undo. |
+| On top | Done | Text (6 styles, 8 colours, 5 entrance animations), 40 emoji or photo stickers, 8 motions, length, "start here", drag/pinch to move/resize/turn. |
+| Sound | Done | 4 original background tunes made in the app (seamless loops, fitted to the video, quiet/medium/loud), 10 sound effects, voiceovers up to 30 s. |
+| Saving | Done | One-tap MP4 (1080p), progress, preview, "Save Video" to Photos on iPhone (download elsewhere). |
+
+**Tested:** unit tests for every edit rule and the tunes; phone + desktop browser runs that build a video with everything above and export it, and the PIN lock. **Not checked by ear:** the four tunes and the new Boing / Wheee sounds were checked by measurement, not listened to.

@@ -6,6 +6,7 @@ import { useApp } from './store';
 import { crashedSession, dismissCrash } from '../storage/recovery';
 import { SyncPanel } from './SyncPanel';
 import { usePublish } from './publisher/pubStore';
+import { KidsStudioStart } from './kids/KidsStudio';
 
 function ratioBox(w: number, h: number) {
   const s = 26 / Math.max(w, h);
@@ -28,6 +29,7 @@ export function Home() {
   const [filter, setFilter] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const [crash, setCrash] = useState(crashedSession);
+  const [kids, setKids] = useState(false);
 
   useEffect(() => { void refreshSummaries(); }, [refreshSummaries]);
 
@@ -49,6 +51,7 @@ export function Home() {
         </div>
         <div style={{ flex: 1 }} />
         <span className="privacy-pill" title="Projects and media are stored in this browser. Nothing is uploaded."><Icon name="device" size={14} />Everything stays on this device</span>
+        <button className="btn kids-entry" onClick={() => setKids(true)}><span aria-hidden>🧸</span>Kids Studio</button>
         <button className="btn" onClick={() => usePublish.getState().setOpen(true)}><Icon name="history" size={16} />Post planner</button>
         <button className="btn" onClick={() => fileRef.current?.click()}><Icon name="folderOpen" size={16} />Open project file</button>
         <input ref={fileRef} type="file" accept=".json,application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void openProjectFile(f); e.target.value = ''; }} />
@@ -114,7 +117,7 @@ export function Home() {
                       onBlur={(e) => { void renameProject(s.id, e.target.value.trim() || s.name); setRenaming(null); }}
                       onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setRenaming(null); }} />
                   ) : (
-                    <div className="name" title={s.name}>{s.name}</div>
+                    <div className="name" title={s.name}>{s.kids && <span className="kids-badge" title="Made in Kids Studio">🧸</span>}{s.name}</div>
                   )}
                   <div className="sub mono">{s.width}×{s.height} · {formatShort(s.duration)} · {ago(s.updatedAt)}</div>
                 </div>
@@ -135,6 +138,7 @@ export function Home() {
           ))}
         </div>
       )}
+      {kids && <KidsStudioStart onClose={() => setKids(false)} />}
       <p className="faint" style={{ marginTop: 36, fontSize: 12 }}>
         Deleting a project removes Framewright’s own copy of its media from this browser. The files on your phone or computer are never changed or deleted.
       </p>

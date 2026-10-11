@@ -63,6 +63,12 @@ The embedded link is great for quick edits, but auto-captions, background remova
 
 Schedule a finished video to YouTube, Instagram and TikTok at once — shared or per-platform captions, titles and hashtags, a weekly posting queue and a calendar. In the desktop app it can post for you once you connect your accounts (your own free developer access for each platform); everywhere else it reminds you at the time with the caption copied and the video ready to share. Set-up and limits: [docs/POSTING.md](docs/POSTING.md).
 
+## Kids Studio
+
+A simpler, big-button editor for children, opened from the **Kids Studio** button on the projects screen. A grown-up enters the child's name and picks a 4-number PIN; Kids Studio then stays on (even after the app is closed) until the PIN is entered — or, if it's forgotten, a two-digit long multiplication is answered.
+
+Inside: add photos and videos, trim, split, copy, reorder, speed (slow-mo to 4×, reverse), filters, fill/fit, the clip's volume; text (six styles, colours and entrance animations), emoji or photo stickers with motion, original background tunes (made in the app — no licensed music), sound effects, voiceovers and transitions. Drag and pinch stickers and text on the picture; **Undo** is always there. **Save video** makes an MP4 and, on iPhone, offers *Save Video* to Photos. Kids only see their own videos; a grown-up can open any of them in the full editor (marked 🧸).
+
 ## Architecture
 
 ```

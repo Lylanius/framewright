@@ -358,6 +358,15 @@ export interface Project {
   magnetic: boolean;
   luts?: LutAsset[];
   folder?: string;
+  /** Made in Kids Studio: the simple editor's own settings. */
+  kids?: KidsSettings;
+}
+
+export interface KidsSettings {
+  /** How clips join (a transition type), or none. */
+  joins?: string | null;
+  /** Background tune under the whole video. */
+  music?: { mediaId: string; volume: number } | null;
 }
 
 export interface ProjectSummary {
@@ -370,4 +379,6 @@ export interface ProjectSummary {
   duration: number;
   folder?: string;
   thumbnail?: string;
+  /** Made in Kids Studio. */
+  kids?: boolean;
 }

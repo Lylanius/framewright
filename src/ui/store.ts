@@ -33,6 +33,9 @@ export interface ImportJob { total: number; done: number; current: string }
 
 interface AppState {
   screen: 'home' | 'editor';
+  /** Kids Studio: the simple, big-button editor. Stays on (even after the app is closed) until a grown-up leaves it. */
+  kidsMode: boolean;
+  setKidsMode(on: boolean): Promise<void>;
   project: Project | null;
   history: HistoryState;
   selection: string[];
@@ -69,7 +72,7 @@ interface AppState {
   setScopes(s: AppState['scopes']): void;
 
   refreshSummaries(): Promise<void>;
-  newProject(name: string, settings: ProjectSettings): Promise<void>;
+  newProject(name: string, settings: ProjectSettings, extra?: (p: Project) => Project): Promise<void>;
   openProject(id: string): Promise<void>;
   openProjectFile(file: File): Promise<void>;
   /** Open a project built in memory (e.g. from a template) and save it. */
@@ -114,6 +117,7 @@ function summarise(p: Project): ProjectSummary {
     id: p.id, name: p.name, updatedAt: p.updatedAt, createdAt: p.createdAt,
     width: p.settings.width, height: p.settings.height, duration: projectDuration(p),
     folder: p.folder, thumbnail: firstVisual?.thumbnails?.[Math.floor((firstVisual.thumbnails.length - 1) / 2)],
+    ...(p.kids ? { kids: true } : {}),
   };
 }
 
@@ -230,6 +234,12 @@ export const useApp = create<AppState>((set, get) => {
 
   return {
     screen: 'home',
+    kidsMode: db.prefs.get('kidsMode', false),
+    async setKidsMode(on) {
+      db.prefs.set('kidsMode', on);
+      if (get().project) await get().closeProject();
+      set({ kidsMode: on, screen: 'home' });
+    },
     project: null,
     history: emptyHistory(),
     selection: [],
@@ -262,8 +272,9 @@ export const useApp = create<AppState>((set, get) => {
       set({ storageOk: ok, summaries: ok ? await db.listProjects() : [] });
     },
 
-    async newProject(name, settings) {
-      const p = createProject(name, settings);
+    async newProject(name, settings, extra) {
+      const p0 = createProject(name, settings);
+      const p = extra ? extra(p0) : p0;
       set({ project: p, history: emptyHistory(), selection: [], selectedTransition: null, screen: 'editor', missingMedia: [], zoom: 80, panel: 'media' });
       markSessionOpen(p.id, p.name);
       useTime.getState().setTime(0);

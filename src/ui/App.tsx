@@ -2,6 +2,7 @@ import { useApp } from './store';
 import { Editor } from './Editor';
 import { ErrorBoundary } from './ErrorBoundary';
 import { Home } from './Home';
+import { KidsStudio } from './kids/KidsStudio';
 import { Icon } from './components/Icon';
 import { useEffect } from 'react';
 import { installNativeHooks } from './nativeHooks';
@@ -26,6 +27,7 @@ function Toasts() {
 export function App() {
   const screen = useApp((s) => s.screen);
   const project = useApp((s) => s.project);
+  const kidsMode = useApp((s) => s.kidsMode);
   useEffect(() => { installNativeHooks(); const t = setTimeout(installNativeHooks, 1500); return () => clearTimeout(t); }, []);
   // Editor: lock the page so it can't scroll or rubber-band on phones.
   useEffect(() => { document.documentElement.classList.toggle('fw-editor', screen === 'editor'); }, [screen]);
@@ -33,8 +35,9 @@ export function App() {
   useEffect(() => { startScheduler(); }, []);
   return (
     <>
-      {screen === 'editor' && project ? <ErrorBoundary key={project.id}><Editor /></ErrorBoundary> : <Home />}
-      <Publisher />
+      {kidsMode ? <ErrorBoundary key={project?.id ?? 'kids'}><KidsStudio /></ErrorBoundary>
+        : screen === 'editor' && project ? <ErrorBoundary key={project.id}><Editor /></ErrorBoundary> : <Home />}
+      {!kidsMode && <Publisher />}
       <Toasts />
     </>
   );

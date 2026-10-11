@@ -80,6 +80,30 @@ export const SFX: SfxDef[] = [
     },
   },
   {
+    id: 'boing', name: 'Boing', description: 'Springy bounce.', seconds: 0.7,
+    make: (r) => {
+      let ph = 0;
+      return render(0.7, r, 0.7, (t) => {
+        const f = 140 + 260 * Math.exp(-t * 5) * (1 + 0.35 * Math.sin(TAU * 13 * t)); // wobbling spring
+        ph += (TAU * f) / r;
+        return (Math.sin(ph) + 0.3 * Math.sin(2 * ph)) * env(t, 0.004, 0.25);
+      });
+    },
+  },
+  {
+    id: 'whee', name: 'Wheee!', description: 'Slide whistle going up.', seconds: 0.9,
+    make: (r) => {
+      let ph = 0;
+      const n = noise(17), lp = biquad('lp', r);
+      return render(0.9, r, 0.6, (t) => {
+        const x = t / 0.9;
+        ph += (TAU * (600 + 1500 * x * x) * (1 + 0.01 * Math.sin(TAU * 6 * t))) / r;
+        const breath = lp(n(), 3000, 0.7) * 0.08;
+        return (Math.sin(ph) + breath) * Math.sin(Math.PI * Math.min(1, x * 1.15)) ** 0.5;
+      });
+    },
+  },
+  {
     id: 'buzzer', name: 'Buzzer (wrong)', description: 'Low buzz for a wrong answer.', seconds: 0.6,
     make: (r) => {
       const lp = biquad('lp', r);
