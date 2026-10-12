@@ -1,5 +1,5 @@
 /** Browser side of the shiny decoys: read the two pictures, write two recoloured PNGs. */
-import { mainHue, pickFakeShifts, recolour } from '../core/shinyFakes';
+import { mainHue, pickFakeShifts, pickTweak, recolour } from '../core/shinyFakes';
 
 const MAX = 900; // plenty for a tile in a 1080-wide video
 
@@ -27,11 +27,15 @@ export async function makeFakes(normal: File, shiny: File): Promise<[File, File]
   const n = pixels(a), s = pixels(b);
   const hn = mainHue(n.data.data), hs = mainHue(s.data.data);
   const grey = hn.saturation < 0.08; // white/grey/black character: tint it rather than turn its colours
-  const shifts = grey ? pickFakeShifts(hs.saturation < 0.08 ? 0 : hs.hue).map((d) => d) as [number, number] : pickFakeShifts((hs.hue - hn.hue + 360) % 360);
+  // Random each time (and each "New colours" tap), so the decoys aren't always the same two colours.
+  // Each decoy a different colour family from the normal, the real shiny and each other.
+  const shifts = grey
+    ? pickFakeShifts(hs.saturation < 0.08 ? 0 : hs.hue, Math.random, 50, hs.saturation < 0.08 ? null : 0)
+    : pickFakeShifts((hs.hue - hn.hue + 360) % 360, Math.random, 50, hn.hue);
   const out: File[] = [];
   for (const [i, shift] of shifts.entries()) {
     const copy = new ImageData(new Uint8ClampedArray(n.data.data), n.data.width, n.data.height);
-    recolour(copy.data, shift, grey);
+    recolour(copy.data, shift, grey, pickTweak());
     n.ctx.putImageData(copy, 0, 0);
     const blob = await new Promise<Blob>((res, rej) => n.canvas.toBlob((x) => (x ? res(x) : rej(new Error('Couldn’t make the decoy picture.'))), 'image/png'));
     out.push(new File([blob], `${normal.name.replace(/\.\w+$/, '')} decoy ${i + 1}.png`, { type: 'image/png' }));

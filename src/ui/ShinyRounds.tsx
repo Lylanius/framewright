@@ -57,14 +57,28 @@ export function ShinyRounds({ rounds, setRounds, firstRound, onActive, activeId,
     } catch (e) { onError((e as Error).message); } finally { patch(r.id, (x) => ({ ...x, busy: false })); }
   };
 
+  // New random colours for the decoys the app made (ones you picked yourself stay).
+  const reroll = async (r: ShinyDraft) => {
+    if (!r.files[0] || !r.files[1]) return;
+    onActive(r.id);
+    patch(r.id, (x) => ({ ...x, busy: true }));
+    try {
+      const fakes = await makeFakes(r.files[0], r.files[1]);
+      fakes.forEach((fk, i) => { if (!r.own[2 + i]) setFile(r, 2 + i, fk, false); });
+    } catch (e) { onError((e as Error).message); } finally { patch(r.id, (x) => ({ ...x, busy: false })); }
+  };
+
   return (
     <div className="quiz-rounds">
       {rounds.map((r, i) => (
         <div key={r.id} className={`quiz-round shiny-round${r.id === activeId && rounds.length > 1 ? ' previewing' : ''}`} onFocus={() => onActive(r.id)}>
-          <div className="row"><b className="grow">Round {firstRound + i}</b>
-            {r.files[1] && <span className="shiny-answer">Real shiny is <b>{'ABCD'[shinyCorrect(r)]}</b></span>}
+          <div className="row wrap" style={{ rowGap: 4 }}><b style={{ whiteSpace: 'nowrap', flex: 'none' }}>Round {firstRound + i}</b>
+            <span className="shiny-answer" style={{ whiteSpace: 'nowrap', flex: '1 0 auto' }}>{r.files[1] && <>Real shiny is <b>{'ABCD'[shinyCorrect(r)]}</b></>}</span>
+            <span className="row" style={{ gap: 2, marginLeft: 'auto' }}>
+            {r.files[0] && r.files[1] && !(r.own[2] && r.own[3]) && <button className="btn sm ghost" disabled={r.busy} onClick={() => void reroll(r)} aria-label={`New decoy colours for round ${i + 1}`}>🎲 New colours</button>}
             <button className="btn sm ghost" onClick={() => { onActive(r.id); patch(r.id, (x) => ({ ...x, order: shuffled() })); }} aria-label={`Shuffle round ${i + 1}`}>Shuffle</button>
             {rounds.length > 1 && <button className="icon-btn sm" onClick={() => setRounds((rs) => rs.filter((x) => x.id !== r.id))} aria-label={`Remove round ${i + 1}`}><Icon name="trash" size={13} /></button>}
+            </span>
           </div>
           <div className="shiny-slots">
             {SHINY_SOURCES.map((name, src) => (
@@ -79,7 +93,7 @@ export function ShinyRounds({ rounds, setRounds, firstRound, onActive, activeId,
               </div>
             ))}
           </div>
-          <small className="faint">Add the normal one and the real shiny — two decoy colours are made for you (tap a decoy to use your own picture instead). The letters are shuffled; tap Shuffle for a different order.</small>
+          <small className="faint">Add the normal one and the real shiny — two decoys in random colours are made for you (🎲 for different colours, or tap a decoy to use your own picture). The letters are shuffled; tap Shuffle for a different order.</small>
         </div>
       ))}
       <button className="btn" onClick={() => setRounds((rs) => [...rs, blankShiny()])}><Icon name="plus" size={14} />Add a round</button>

@@ -205,6 +205,11 @@ test('spot the real shiny: two pictures in, decoys made, four-card quiz out', as
   // Both decoys appear by themselves, and the answer letter is shown.
   await expect(page.locator('.shiny-slot img')).toHaveCount(4, { timeout: 20_000 });
   await expect(page.locator('.shiny-answer')).toContainText(/Real shiny is [ABCD]/);
+  // 🎲 gives the decoys new colours (the normal and real shiny stay).
+  const decoys = () => page.locator('.shiny-slot img').evaluateAll((els) => els.map((e) => (e as HTMLImageElement).src));
+  const before = await decoys();
+  await page.getByRole('button', { name: 'New decoy colours for round 1' }).click();
+  await expect.poll(async () => { const now = await decoys(); return now[0] === before[0] && now[1] === before[1] && now[2] !== before[2] && now[3] !== before[3]; }, { timeout: 15_000 }).toBe(true);
   await page.locator('.shiny-round').scrollIntoViewIfNeeded();
   await page.screenshot({ path: `test-results/shiny-maker-${tag}.png` });
   await page.getByRole('button', { name: /Add 1 round/ }).click();

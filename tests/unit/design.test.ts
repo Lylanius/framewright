@@ -6,7 +6,7 @@ import { answerScale, answerSlots, buildQuiz, introSubtitle, shinyLayout, SHINY_
 import { valueAt } from '../../src/core/keyframes';
 import { maskValue } from '../../src/core/masks';
 import { SFX, wavBytes } from '../../src/core/sfx';
-import { mainHue, pickFakeShifts, recolour } from '../../src/core/shinyFakes';
+import { hueFamily, mainHue, pickFakeShifts, pickTweak, recolour } from '../../src/core/shinyFakes';
 import { tidyVoice, toMono } from '../../src/core/voiceTrim';
 import { alignBox, distribute, snapBox } from '../../src/core/snap';
 import { addOverlayClip, addUnderlayClip, findClip, mainTrackIndex, moveClipLayer, projectDuration } from '../../src/core/timeline';
@@ -268,11 +268,34 @@ describe('quiz maker', () => {
     }
   });
   it('shiny decoys: colours picked well away from the normal and the real shiny', () => {
+    let seed = 7;
+    const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
     for (const shift of [0, 40, 120, 180, 300]) {
-      const [a, b] = pickFakeShifts(shift);
+      // Different every time, but always far enough apart.
+      const pairs = new Set<string>();
+      for (let n = 0; n < 40; n++) {
+        const [a, b] = pickFakeShifts(shift, rand);
+        pairs.add([a, b].sort((x, y) => x - y).join('/'));
+        const far = (x: number, y: number) => { const d = Math.abs(x - y) % 360; return Math.min(d, 360 - d); };
+        for (const d of [far(a, 0), far(b, 0), far(a, shift), far(b, shift), far(a, b)]) expect(d, `shift ${shift}`).toBeGreaterThanOrEqual(50);
+      }
+      expect(pairs.size, `variety for shift ${shift}`).toBeGreaterThanOrEqual(8);
+      const t = pickTweak(rand);
+      expect(t.sat).toBeGreaterThanOrEqual(0.85); expect(t.sat).toBeLessThanOrEqual(1.2);
+      expect(Math.abs(t.light)).toBeLessThanOrEqual(0.06);
+      const [a, b] = pickFakeShifts(shift, rand);
       const far = (x: number, y: number) => { const d = Math.abs(x - y) % 360; return Math.min(d, 360 - d); };
-      for (const d of [far(a, 0), far(b, 0), far(a, shift), far(b, shift), far(a, b)]) expect(d, `shift ${shift}`).toBeGreaterThanOrEqual(75);
+      for (const d of [far(a, 0), far(b, 0), far(a, shift), far(b, shift), far(a, b)]) expect(d, `shift ${shift}`).toBeGreaterThanOrEqual(50);
     }
+    // Knowing the picture's colour, each decoy is a different colour family:
+    // an orange creature with a lime-green shiny never gets a green decoy.
+    for (let n = 0; n < 60; n++) {
+      const base = 30, shinyShift = 50; // orange → lime green
+      const [a, b] = pickFakeShifts(shinyShift, rand, 50, base);
+      const fam = [hueFamily(base), hueFamily(base + shinyShift), hueFamily(base + a), hueFamily(base + b)];
+      expect(new Set(fam).size, fam.join(',')).toBe(4);
+    }
+    expect(hueFamily(120)).toBe('green'); expect(hueFamily(150)).toBe('green'); expect(hueFamily(220)).toBe('blue'); expect(hueFamily(-10)).toBe('red');
     // An orange pixel turned 120° becomes green; see-through pixels are left alone.
     const px = new Uint8ClampedArray([255, 128, 0, 255, 10, 20, 30, 0]);
     expect(mainHue(px).hue).toBeCloseTo(30, 0);
