@@ -222,6 +222,15 @@ test('spot the real shiny: two pictures in, decoys made, four-card quiz out', as
     await page.locator('.toast').evaluateAll((els) => els.forEach((e) => ((e as HTMLElement).style.display = 'none')));
     await canvas.screenshot({ path: `test-results/shiny-${name}-${tag}.png` });
   };
+  await shot(0, 'cover');
   await shot(5, 'question');
   await shot(10, 'reveal');
+});
+
+test('Templates is the first tool', async ({ page, isMobile }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /^TikTok/ }).click();
+  const first = isMobile ? page.locator('.mobile-tabs button').first() : page.locator('.rail button').first();
+  await expect(first).toContainText('Templates');
+  await page.screenshot({ path: `test-results/tabs-${isMobile ? 'phone' : 'desktop'}.png` });
 });

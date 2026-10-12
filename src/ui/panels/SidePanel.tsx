@@ -17,6 +17,8 @@ import { BrandPanel } from './BrandPanel';
 export interface PanelDef { id: PanelId; label: string; icon: IconName; todo?: { phase: number; items: string[] } }
 
 export const PANELS: PanelDef[] = [
+  // Templates first: the quiz maker lives here and it's what most videos start from.
+  { id: 'templates', label: 'Templates', icon: 'templates' },
   { id: 'media', label: 'Media', icon: 'media' },
   { id: 'audio', label: 'Audio', icon: 'audio' },
   { id: 'text', label: 'Text', icon: 'text' },
@@ -28,7 +30,6 @@ export const PANELS: PanelDef[] = [
   { id: 'adjust', label: 'Adjust', icon: 'adjust' },
   { id: 'canvas', label: 'Canvas', icon: 'canvas' },
   { id: 'stickers', label: 'Elements', icon: 'sticker' },
-  { id: 'templates', label: 'Templates', icon: 'templates' },
   { id: 'brand', label: 'Brand', icon: 'brand' },
 ];
 

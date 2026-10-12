@@ -65,6 +65,8 @@ export const DEFAULT_QUIZ: Omit<QuizOptions, 'sounds'> = {
 export const SHINY_TITLE = 'SPOT THE\nREAL SHINY!';
 export const SHINY_GREEN = '#00E676';
 const LETTERS = ['A)', 'B)', 'C)', 'D)'];
+/** Where the Mystery sting's hit lands in its sound file (seconds). */
+const STING_HIT = 0.38;
 
 /**
  * Spot-the-shiny layout: where the four picture tiles and the A–D buttons go
@@ -163,7 +165,7 @@ export function roundLength(o: Pick<QuizOptions, 'thinkSeconds' | 'revealSeconds
 
 /** Length of the opening title card (0 when switched off). */
 export function introLength(o: Pick<QuizOptions, 'intro' | 'introSeconds'>): number {
-  return o.intro ? Math.max(1, o.introSeconds) : 0;
+  return o.intro ? Math.max(0.5, o.introSeconds) : 0;
 }
 
 /** Whole quiz: intro + every round. */
@@ -210,15 +212,19 @@ export function buildQuiz(p: Project, rounds: QuizRound[], o: QuizOptions): { pr
   const audio: Clip[] = [], swoosh: Clip[] = [], voice: Clip[] = [];
   const snd = (m: MediaItem | undefined, at: number, list = audio) => { if (m) { const c = createClipFromMedia(m, at); c.name = m.name; list.push(c); } };
   const titleStyle: Partial<TextStyle> = { content: o.title, fontFamily: 'Archivo Black', fontSize: Math.round(W * 0.098), color: o.accent, strokeColor: '#1f4fb8', strokeWidth: 9, uppercase: true, lineHeight: 1.02, shadowColor: 'rgba(0,0,0,0.35)', shadowOffsetY: 8 };
-  const FADE = 0.45; // intro → round 1 crossfade
+  // Intro → round 1 crossfade, and how long the title takes to slam in. Both shrink for very short intros (down to 0.5 s).
+  const FADE = intro ? Math.min(0.45, Math.max(0.2, intro * 0.5)) : 0.45;
+  const SLAM = Math.min(0.6, Math.max(0.25, intro * 0.6));
 
+  const shiny = o.kind === 'shiny';
   // Intro: the title slams in over a starburst, holds, then crossfades into round 1.
   if (intro) {
     // Cover: phones and apps use a video's very first frame as its thumbnail, so when the
     // quiz opens the video, that frame shows the finished title card. Then the slam plays.
     const cover = start0 < 1e-6 ? 1 / p.settings.fps : 0;
     const introStyle = { ...titleStyle, fontSize: Math.round(W * 0.085) };
-    if (cover) {
+    // (Spot the shiny uses round 1's question as its cover instead — see below.)
+    if (cover && !shiny) {
       const still = createShapeClip(burstStyle(q, W * 1.15), start0, cover);
       still.name = 'Cover starburst';
       still.motion = motion({ in: 'none' });
@@ -227,14 +233,16 @@ export function buildQuiz(p: Project, rounds: QuizRound[], o: QuizOptions): { pr
       t.name = 'Cover title';
       put(T.introTitle, t);
     }
+    // The slam "lands" (reaches full size) about 63% of the way through.
+    const land = cover + SLAM * 0.63;
     // Line under the title ("Round 8", or your own words): pops in just after the title lands.
     const sub = introSubtitle(o, rounds.length);
     if (sub) {
       const subStyle: Partial<TextStyle> = { content: sub, fontFamily: 'Archivo Black', fontSize: Math.round(W * 0.052), color: '#ffffff', strokeColor: '#1f4fb8', strokeWidth: 7, uppercase: true, shadowColor: 'rgba(0,0,0,0.35)', shadowOffsetY: 6 };
       const lines = o.title.split('\n').length, y = 0.03 + lines * 0.027; // sits just below the title, however many lines it has
-      if (cover) { const c = text(start0, cover, y, 0, subStyle, { in: 'none' }); c.name = 'Cover subtitle'; put(T.introSub, c); }
-      const at = Math.max(cover, Math.min(0.55, intro - 0.6));
-      const c = text(start0 + at, intro + FADE - at, y, 0, subStyle, { in: 'pop', out: 'fade', duration: 0.3 });
+      if (cover && !shiny) { const c = text(start0, cover, y, 0, subStyle, { in: 'none' }); c.name = 'Cover subtitle'; put(T.introSub, c); }
+      const at = Math.max(cover, Math.min(0.55, land + 0.15, intro - 0.3));
+      const c = text(start0 + at, intro + FADE - at, y, 0, subStyle, { in: 'pop', out: 'fade', duration: Math.min(0.3, FADE) });
       c.name = 'Intro subtitle';
       put(T.introSub, c);
     }
@@ -242,10 +250,17 @@ export function buildQuiz(p: Project, rounds: QuizRound[], o: QuizOptions): { pr
     burst.name = 'Intro starburst';
     burst.motion = motion({ in: 'zoom', out: 'fade', duration: FADE });
     put(T.introBurst, burst);
-    put(T.introTitle, text(start0 + cover, intro + FADE - cover, 0, 0, introStyle, { in: 'slam', out: 'fade', duration: 0.6 }));
-    snd(o.sounds.introVoice, start0 + (o.sounds.sting ? 0.4 : 0.1), voice); // with the sting, the shout comes on the hit
-    snd(o.sounds.boom, start0 + 0.38); // as the title lands
-    snd(o.sounds.sting, start0); // builds for 0.38 s, then hits as the title lands
+    put(T.introTitle, text(start0 + cover, intro + FADE - cover, 0, 0, introStyle, { in: 'slam', out: 'fade', duration: SLAM }));
+    snd(o.sounds.introVoice, start0 + (o.sounds.sting ? land + 0.02 : Math.min(0.1, land)), voice); // with the sting, the shout comes on the hit
+    snd(o.sounds.boom, start0 + land); // as the title lands
+    // The sting builds for 0.38 s, then hits as the title lands; with a very short intro its build-up is shortened.
+    if (o.sounds.sting) {
+      const at = start0 + land - STING_HIT;
+      const c = createClipFromMedia(o.sounds.sting, Math.max(start0, at));
+      c.name = o.sounds.sting.name;
+      if (at < start0) { c.sourceIn = start0 - at; c.duration = Math.max(0.1, c.duration - c.sourceIn); }
+      audio.push(c);
+    }
   }
   // Starburst behind the picture for every round.
   if (o.burst && rounds.length && o.kind !== 'shiny') {
@@ -255,18 +270,52 @@ export function buildQuiz(p: Project, rounds: QuizRound[], o: QuizOptions): { pr
     put(T.burst, b);
   }
 
-  const shiny = o.kind === 'shiny';
+  // Spot the shiny's cover (the video's first frame, used as its thumbnail): round 1's
+  // question with everything in place — the title sharp at the top and all four cards
+  // and A–D buttons fully shown. One frame, then the video plays as normal.
+  const shinyCover = shiny && start0 < 1e-6 ? 1 / p.settings.fps : 0;
   if (shiny) rounds.forEach((r, k) => {
     const s = roundsStart + k * len, thinkEnd = s + INTRO + o.thinkSeconds, H = p.settings.height;
     const L = shinyLayout(W, H), navy = '#1b2a57';
     const firstIn: Partial<ClipMotion> = intro ? { in: 'fade', duration: FADE } : { in: 'slam', duration: 0.7 };
-    put(T.title, text(s, len, -0.37, 0, { ...titleStyle, fontSize: Math.round(W * 0.085) }, k === 0 ? firstIn : { in: 'pop', duration: 0.35 }));
-    if (o.showRound) put(T.round, text(s + 0.15, len - 0.15, -0.298, 0, { content: `Round ${o.firstRound + k}`, fontFamily: 'Archivo Black', fontSize: Math.round(W * 0.036), color: '#ffffff', strokeColor: '#1f4fb8', strokeWidth: 5 }, { in: 'fade' }));
+    const shinyTitle = { ...titleStyle, fontSize: Math.round(W * 0.085) };
+    const roundStyle: Partial<TextStyle> = { content: `Round ${o.firstRound + k}`, fontFamily: 'Archivo Black', fontSize: Math.round(W * 0.036), color: '#ffffff', strokeColor: '#1f4fb8', strokeWidth: 5 };
+    const cardStyle: ShapeStyle = { ...defaultShape('rect'), width: L.tile, height: L.tile, radius: L.tile * 0.1, fill: '#ffffff', fill2: '#dfeaff', stroke: navy, strokeWidth: 7, shadow: 10 };
+    const badgeStyle = (i: number): Partial<TextStyle> => ({ content: 'ABCD'[i], fontFamily: 'Archivo Black', fontSize: Math.round(L.tile * 0.13), color: navy, background: o.accent, backgroundBorder: navy, backgroundBorderWidth: 5, backgroundPadding: Math.round(L.tile * 0.035), backgroundRadius: Math.round(L.tile * 0.05), backgroundFull: true, boxWidth: (L.tile * 0.11) / W, align: 'center' });
+    const buttonStyle = (i: number): Partial<TextStyle> => ({ content: 'ABCD'[i], fontFamily: 'Archivo Black', fontSize: Math.round(W * 0.055), color: navy, background: '#ffffff', backgroundBorder: navy, backgroundBorderWidth: 5, backgroundPadding: 20, backgroundRadius: 28, backgroundFull: true, boxWidth: L.btnWidth - BTN_EDGE, align: 'center' });
+    const badgeAt = (i: number) => ({ x: L.tiles[i].x - (L.tile * 0.36) / W, y: L.tiles[i].y - (L.tile * 0.36) / H });
+    const variants = (r.variants ?? []).slice(0, 4);
+    if (k === 0 && shinyCover) {
+      const still: Partial<ClipMotion> = { in: 'none' };
+      const named = (c: Clip, n: string) => { c.name = n; return c; };
+      put(T.title, named(text(start0, shinyCover, -0.37, 0, shinyTitle, still), 'Cover title'));
+      if (o.showRound) put(T.round, named(text(start0, shinyCover, -0.298, 0, roundStyle, still), 'Cover round'));
+      variants.forEach((m, i) => {
+        const { x, y } = L.tiles[i];
+        const card = createShapeClip(cardStyle, start0, shinyCover);
+        card.name = `Cover card ${'ABCD'[i]}`;
+        card.transform = { ...card.transform, x, y };
+        card.motion = motion(still);
+        put(T.card + i, card);
+        const pic = createClipFromMedia(m, start0);
+        pic.duration = shinyCover;
+        pic.fit = 'contain';
+        pic.name = `Cover picture ${'ABCD'[i]}`;
+        pic.transform = { ...pic.transform, x, y, scale: pictureScale(q, m, L.tile * 0.8) };
+        put(T.variant + i, pic);
+        put(T.letter + i, named(text(start0, shinyCover, badgeAt(i).y, badgeAt(i).x, badgeStyle(i), still), `Cover letter ${'ABCD'[i]}`));
+        put(T.answer + i, named(text(start0, shinyCover, L.buttons[i].y, L.buttons[i].x, buttonStyle(i), still), `Cover button ${'ABCD'[i]}`));
+      });
+    }
+    // Without an intro, round 1's title starts just after the cover frame.
+    const t0 = k === 0 && shinyCover && !intro ? s + shinyCover : s;
+    put(T.title, text(t0, s + len - t0, -0.37, 0, shinyTitle, k === 0 ? firstIn : { in: 'pop', duration: 0.35 }));
+    if (o.showRound) put(T.round, text(s + 0.15, len - 0.15, -0.298, 0, roundStyle, { in: 'fade' }));
     // At the reveal the three wrong ones fade back so the real shiny stands out.
     const dim = (c: Clip, wrong: boolean) => { if (wrong) c.keyframes = { ...c.keyframes, opacity: [{ t: 0, v: 1, ease: 'hold' }, { t: thinkEnd - c.start, v: 1, ease: 'easeOut' }, { t: thinkEnd - c.start + 0.4, v: 0.3, ease: 'linear' }] }; return c; };
-    (r.variants ?? []).slice(0, 4).forEach((m, i) => {
+    variants.forEach((m, i) => {
       const { x, y } = L.tiles[i], wrong = i !== r.correct, at = s + 0.25 + i * 0.1;
-      const card = createShapeClip({ ...defaultShape('rect'), width: L.tile, height: L.tile, radius: L.tile * 0.1, fill: '#ffffff', fill2: '#dfeaff', stroke: navy, strokeWidth: 7, shadow: 10 }, at, s + len - at);
+      const card = createShapeClip(cardStyle, at, s + len - at);
       card.name = `Card ${'ABCD'[i]}`;
       card.transform = { ...card.transform, x, y };
       card.motion = motion({ in: 'pop' });
@@ -278,12 +327,11 @@ export function buildQuiz(p: Project, rounds: QuizRound[], o: QuizOptions): { pr
       pic.motion = motion({ in: 'pop' });
       put(T.variant + i, dim(pic, wrong));
       // Letter badge on the card's top-left corner.
-      const badge = text(at + 0.12, s + len - at - 0.12, y - (L.tile * 0.36) / H, x - (L.tile * 0.36) / W,
-        { content: 'ABCD'[i], fontFamily: 'Archivo Black', fontSize: Math.round(L.tile * 0.13), color: navy, background: o.accent, backgroundBorder: navy, backgroundBorderWidth: 5, backgroundPadding: Math.round(L.tile * 0.035), backgroundRadius: Math.round(L.tile * 0.05), backgroundFull: true, boxWidth: (L.tile * 0.11) / W, align: 'center' }, { in: 'pop' });
+      const badge = text(at + 0.12, s + len - at - 0.12, badgeAt(i).y, badgeAt(i).x, badgeStyle(i), { in: 'pop' });
       put(T.letter + i, dim(badge, wrong));
       // Answer buttons: plain A–D; the right one turns solid green with white text.
       const b = L.buttons[i], bs = s + 0.6 + i * 0.08;
-      const base: Partial<TextStyle> = { content: 'ABCD'[i], fontFamily: 'Archivo Black', fontSize: Math.round(W * 0.055), color: navy, background: '#ffffff', backgroundBorder: navy, backgroundBorderWidth: 5, backgroundPadding: 20, backgroundRadius: 28, backgroundFull: true, boxWidth: L.btnWidth - BTN_EDGE, align: 'center' };
+      const base = buttonStyle(i);
       const end = wrong ? s + len : thinkEnd + 0.2;
       put(T.answer + i, dim(text(bs, end - bs, b.y, b.x, base, { in: 'pop' }), wrong));
       if (!wrong) {

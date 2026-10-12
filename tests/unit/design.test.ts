@@ -214,7 +214,7 @@ describe('quiz maker', () => {
     const all = r.project.tracks.flatMap((t) => t.clips);
     const thinkEnd = 1 + o.thinkSeconds;
     // Four pictures, each on its own card, laid out 2 × 2 inside the frame.
-    const pics = four.map((m) => all.find((c) => c.mediaId === m.id)!);
+    const pics = four.map((m) => all.find((c) => c.mediaId === m.id && !c.name.startsWith('Cover'))!);
     expect(new Set(pics.map((c) => `${c.transform.x.toFixed(2)},${c.transform.y.toFixed(2)}`)).size).toBe(4);
     const { width: W, height: H } = empty.settings;
     const L = shinyLayout(W, H);
@@ -237,6 +237,36 @@ describe('quiz maker', () => {
     expect(all.find((c) => c.name === 'Shiny glow')!.shape!.stroke).toBe(SHINY_GREEN);
     for (const t of r.project.tracks) { const cs = [...t.clips].sort((a, b) => a.start - b.start); for (let i = 1; i < cs.length; i++) expect(cs[i].start).toBeGreaterThanOrEqual(cs[i - 1].start + cs[i - 1].duration - 1e-6); }
   });
+  it('spot the shiny: the cover frame is round 1’s question with the title and all four options shown', () => {
+    const { p } = sampleProject();
+    const four = ['N', 'S', 'F1', 'F2'].map((id) => pic(id));
+    const empty = { ...p, tracks: p.tracks.map((t) => ({ ...t, clips: [] })), media: four };
+    for (const intro of [true, false]) {
+      const o = { ...DEFAULT_QUIZ, kind: 'shiny' as const, title: 'SPOT THE\nREAL SHINY!', intro, sounds: {} };
+      const r = buildQuiz(empty, [{ picture: four[0], answers: [], correct: 1, variants: four }], o);
+      const all = r.project.tracks.flatMap((t) => t.clips);
+      const atZero = all.filter((c) => c.start === 0 && c.duration > 0);
+      const frame = 1 / empty.settings.fps;
+      // The title, sharp (no animation), at the top.
+      const title = atZero.find((c) => c.text?.content === o.title)!;
+      expect(title.motion?.in ?? 'none').toBe('none');
+      expect(title.transform.y).toBeLessThan(-0.3);
+      expect(title.duration).toBeCloseTo(frame);
+      // All four pictures, cards, letters and buttons, fully shown.
+      expect(four.every((m) => atZero.some((c) => c.mediaId === m.id))).toBe(true);
+      expect(atZero.filter((c) => c.name.startsWith('Cover card'))).toHaveLength(4);
+      for (const ch of 'ABCD') expect(atZero.filter((c) => c.text?.content === ch)).toHaveLength(2); // badge + button
+      for (const c of atZero) {
+        expect(c.keyframes.opacity, c.name).toBeUndefined();
+        expect(c.motion?.in ?? 'none', c.name).toBe('none');
+      }
+      // Not the intro's title card, and no green "right answer" yet.
+      expect(all.some((c) => c.name === 'Cover starburst')).toBe(false);
+      expect(atZero.some((c) => c.text?.background === SHINY_GREEN)).toBe(false);
+      // Nothing overlaps on a track.
+      for (const t of r.project.tracks) { const cs = [...t.clips].sort((a, b) => a.start - b.start); for (let i = 1; i < cs.length; i++) expect(cs[i].start, t.name).toBeGreaterThanOrEqual(cs[i - 1].start + cs[i - 1].duration - 1e-6); }
+    }
+  });
   it('shiny decoys: colours picked well away from the normal and the real shiny', () => {
     for (const shift of [0, 40, 120, 180, 300]) {
       const [a, b] = pickFakeShifts(shift);
@@ -254,6 +284,29 @@ describe('quiz maker', () => {
     expect(mainHue(grey).saturation).toBe(0);
     recolour(grey, 240, true);
     expect(grey[2]).toBeGreaterThan(grey[0] + 30);
+  });
+  it('a very short intro (0.5 s): title still slams in, the boom and sting still land with it', () => {
+    const { p } = sampleProject();
+    const before = projectDuration(p);
+    const boom = media('boom', 1.2, 'audio'), sting = media('sting', 2, 'audio');
+    const o = { ...DEFAULT_QUIZ, introSeconds: 0.5 };
+    expect(introLength(o)).toBe(0.5);
+    expect(introLength({ ...o, introSeconds: 0.2 })).toBe(0.5); // never shorter than half a second
+    const build = (sounds: object) => buildQuiz({ ...p, media: [...p.media, pic('P1'), boom, sting] }, [{ picture: pic('P1'), answers: ['Aa', 'Bb'], correct: 0 }], { ...o, sounds }).project.tracks.flatMap((t) => t.clips);
+    const all = build({ boom });
+    const title = all.find((c) => c.motion?.in === 'slam')!;
+    expect(title.motion!.duration).toBeLessThanOrEqual(0.5);
+    const landsAt = title.start + title.motion!.duration * 0.63;
+    expect(all.find((c) => c.mediaId === 'boom')!.start).toBeCloseTo(landsAt);
+    expect(landsAt - before).toBeLessThan(0.5);
+    // Round 1 starts half a second in.
+    expect(all.find((c) => c.mediaId === 'P1')!.start).toBeCloseTo(before + 0.5 + 0.35);
+    const sub = all.find((c) => c.name === 'Intro subtitle')!;
+    expect(sub.start - before).toBeLessThan(0.5);
+    // Sting: its build-up is trimmed so the hit (0.38 s into the file) still lands with the title.
+    const st = build({ sting }).find((c) => c.mediaId === 'sting')!;
+    expect(st.start).toBeCloseTo(before);
+    expect(st.start - st.sourceIn + 0.38).toBeCloseTo(landsAt);
   });
   it('adds an intro that slams the title in, then crossfades into round 1', () => {
     const { p } = sampleProject();

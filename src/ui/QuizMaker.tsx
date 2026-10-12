@@ -157,7 +157,7 @@ export function QuizMaker({ onClose }: { onClose: () => void }) {
           <label className="row"><input type="checkbox" checked={opts.intro} onChange={() => set({ intro: !opts.intro })} aria-label="Start with an intro" /> Start with an intro (title slams in)</label>
           {opts.intro && (
             <div className="quiz-intro">
-              <PropRow label="Intro length" value={opts.introSeconds} min={1.5} max={6} step={0.5} unit="s" onChange={(v) => set({ introSeconds: v })} />
+              <PropRow label="Intro length" value={opts.introSeconds} min={0.5} max={6} step={0.5} unit="s" onChange={(v) => set({ introSeconds: Math.max(0.5, v) })} />
               <div className="field"><span>Under the title</span>
                 <Seg label="Under the title" value={opts.introSub} onChange={(v: QuizOptions['introSub']) => set({ introSub: v })} options={[{ value: 'round', label: 'Round number' }, { value: 'custom', label: 'My own text' }, { value: 'none', label: 'Nothing' }]} />
               </div>
